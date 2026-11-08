@@ -1,6 +1,6 @@
 # Migration and vault files
 
-The supported route from `ssemakov/pass` is migration. The new app preserves the seven `login_items` fields and adds version/format tables; do not use the new vault in the legacy app. Legacy inputs support SQLCipher compatibility profiles 4 and 3, with the expected legacy schema. Other formats or unexpected schema objects are rejected.
+The supported route from `ssemakov/pass` is migration. The new app preserves the seven `login_items` fields and adds version/format tables; do not use the new vault in the legacy app. Legacy inputs support SQLCipher compatibility profiles 4 and 3, with the expected legacy schema. Other formats or unexpected schema objects are rejected. Historical SQLCipher raw-key literals can be used as the source password in the import/preservation flow; normal vault passwords and fresh destinations reject those reserved literal forms so password derivation cannot be bypassed.
 
 ## First migration
 

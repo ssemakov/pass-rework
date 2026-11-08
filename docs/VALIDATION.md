@@ -35,7 +35,7 @@ The `e2e` Go build tag and Vite mode expose synthetic test controls only in that
 | Gate | Evidence |
 |---|---|
 | Native cipher configuration | Exact version/provider/settings/temp-store readback |
-| Encryption failure behavior | Wrong password, plaintext input, plain SQLite reader, tampered page |
+| Encryption failure behavior | Wrong password, plaintext input, plain SQLite reader, tampered page, reserved raw-key password rejection/legacy conversion |
 | No plaintext persistence | Vault header/sentinel and live encrypted journal inspection |
 | Legacy compatibility | Actual historical driver fixture plus genuine profiles 3/4; source hash unchanged |
 | Exact transfer | Every field/entry, NULL/empty/NUL/Unicode, signed IDs, large timestamps, revisions, sequence |

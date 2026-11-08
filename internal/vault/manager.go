@@ -135,6 +135,9 @@ func (m *Manager) closeLocked() {
 	m.identity = nil
 }
 func (m *Manager) openLocked(path string, key []byte) error {
+	if e := validateMasterPassword(key); e != nil {
+		return e
+	}
 	openingEpoch := m.epoch.Load()
 	loc, e := locate(path)
 	if e != nil {
@@ -427,8 +430,8 @@ func (m *Manager) Rotate(token string, oldKey, newKey []byte) (rollback string, 
 	if e := m.check(token); e != nil {
 		return "", e
 	}
-	if len(newKey) == 0 {
-		return "", ErrInput
+	if e := validateMasterPassword(newKey); e != nil {
+		return "", e
 	}
 	if subtle.ConstantTimeCompare(oldKey, m.key) != 1 {
 		return "", cipher.ErrKey

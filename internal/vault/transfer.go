@@ -14,8 +14,8 @@ func Import(backup, destination string, oldKey, newKey []byte) (int, error) {
 	return importChecked(backup, destination, oldKey, newKey, func() bool { return true })
 }
 func importChecked(backup, destination string, oldKey, newKey []byte, alive func() bool) (count int, err error) {
-	if len(newKey) < 1 {
-		return 0, ErrInput
+	if e := validateMasterPassword(newKey); e != nil {
+		return 0, e
 	}
 	src, e := locate(backup)
 	if e != nil {
@@ -94,6 +94,9 @@ func importChecked(backup, destination string, oldKey, newKey []byte, alive func
 // writeSnapshot is shared by import, live backup and password rotation. It
 // always writes a fresh encrypted candidate, reopens it, and compares every row.
 func writeSnapshot(a *cipher.DB, current bool, dst *location, newKey []byte, alive func() bool, verify func() error) (count int, err error) {
+	if e := validateMasterPassword(newKey); e != nil {
+		return 0, e
+	}
 	stage, e := newStaging(dst)
 	if e != nil {
 		return 0, e
@@ -276,6 +279,9 @@ func PreserveBackup(source, destination string, key []byte) error {
 	return nil
 }
 func newVault(path string, key []byte) error {
+	if e := validateMasterPassword(key); e != nil {
+		return e
+	}
 	dst, e := locate(path)
 	if e != nil {
 		return e

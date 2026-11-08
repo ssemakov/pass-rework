@@ -16,6 +16,8 @@ The application uses upstream **SQLCipher 4.20.0 Community**, commit `355d4db92d
 | macOS crypto provider | Apple's CommonCrypto |
 | Linux test provider | OpenSSL; Linux is a storage/browser-test host, not a shipping GUI target |
 
+Normal vault passwords reject SQLCipher's exact reserved raw-key literal forms (`x'hex'`/`X'hex'`, with 64, 96 or 160 hex digits). Those upstream forms bypass password derivation even when a settings readback reports 256,000 iterations; rejecting them keeps the new-vault password-KDF guarantee accurate. Near-match ordinary passphrases remain supported. Read-only legacy import/preservation accepts historical raw-key sources and migrates them to an ordinary new passphrase.
+
 SQLCipher's format, randomness, key separation, encryption and authentication implementation supply the cryptographic construction. File size, filesystem timestamps and access patterns remain observable. A strong password is required: possession of the file permits offline guesses. Legacy profiles are tried only for read-only import and never become the default for a fresh destination.
 
 Each connection verifies `cipher_version`, `cipher_status` and the exact effective cipher profile settings before use, then authenticates a schema read after keying. `sqlite3_key` receives an explicit byte length; passwords are never interpolated into SQL. Prepared statements bind all entry values with explicit lengths and copy semantics. NULL, empty, embedded NUL, Unicode and signed 64-bit integers are preserved across the native boundary. C-owned transient buffers are wiped/freed; results are copied before statements are finalized.
