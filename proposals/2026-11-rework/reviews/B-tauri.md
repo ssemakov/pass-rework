@@ -1,5 +1,7 @@
 # Adversarial review B — Tauri / Rust / SQLCipher
 
+Historical review of the original proposal. Later owner decisions supersede the former macOS 13 scope and any requirement for a commissioned external human audit in v1; tests and adversary-agent review remain. See [current discussion decisions](../DISCUSSION-DECISIONS.md) and [dispositions](../REVIEW-RESULTS.md). The original findings below are preserved.
+
 Reviewer: separate adversary agent `/root/adversary_tauri`, 2026-11-08.
 
 Scope: Option B and the shared migration/evidence documents as first drafted, published at [`b7fede59b8acbc3d07bc59e53deacc210739c800`](https://github.com/ssemakov/pass-rework/commit/b7fede59b8acbc3d07bc59e53deacc210739c800). This is a design review, not an implementation audit. No app, encryption, migration or macOS runtime tests were performed. Primary Tauri documentation was checked to challenge the proposed privilege boundary.

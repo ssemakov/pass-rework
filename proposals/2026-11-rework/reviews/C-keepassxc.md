@@ -1,5 +1,7 @@
 # Adversarial review C — KeePassXC adoption and KDBX migration
 
+Historical review of the original proposal. Later owner decisions supersede the former macOS 13 scope and any requirement for a commissioned external human audit in v1; tests and adversary-agent review remain. See [current discussion decisions](../DISCUSSION-DECISIONS.md) and [dispositions](../REVIEW-RESULTS.md). The original findings below are preserved.
+
 Reviewer: separate adversary agent `/root/adversary_keepassxc`. Date: 2026-11-08. Scope: Option C and its shared migration/evidence documents as drafted. This is a design review, not an implementation audit. I independently checked the official download/audit pages and selected KeePassXC 2.8.0 import/serialization source. No executable or macOS tests were run.
 
 ## Verdict

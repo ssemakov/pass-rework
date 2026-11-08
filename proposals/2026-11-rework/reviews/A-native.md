@@ -1,5 +1,7 @@
 # Adversarial review A — native SwiftUI/AppKit + SQLCipher
 
+Historical review of the original proposal. Later owner decisions supersede the former macOS 13 scope and any requirement for a commissioned external human audit in v1; tests and adversary-agent review remain. See [current discussion decisions](../DISCUSSION-DECISIONS.md) and [dispositions](../REVIEW-RESULTS.md). The original findings below are preserved.
+
 Reviewer: dedicated adversary agent for Option A. Date: 2026-11-08.
 
 Scope: OPTIONS, LEGACY-AND-MIGRATION and ENCRYPTION-EVIDENCE at proposal snapshot [`b7fede59b8acbc3d07bc59e53deacc210739c800`](https://github.com/ssemakov/pass-rework/commit/b7fede59b8acbc3d07bc59e53deacc210739c800). This review challenges the proposed design; it does not audit code or certify encryption. No app, vault migration or macOS execution test was run.
