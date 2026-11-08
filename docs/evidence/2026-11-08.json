@@ -1,0 +1,70 @@
+{
+  "implementationCommit": "a54a9852f32adeba027046bc7a6d9b6ecd57e4bd",
+  "workflowRun": 42533514896,
+  "workflowURL": "https://github.com/ssemakov/pass-rework/actions/runs/42533514896",
+  "result": "all five jobs succeeded",
+  "go": "1.27.3",
+  "wails": "3.1.0",
+  "sqlcipher": {
+    "version": "4.20.0 community",
+    "commit": "355d4db92d3404e71faa8088d071a71d767807f4",
+    "sourceArchiveSHA256": "fc5394c916beeabb1f43e2ac97d0827f36e8917f6675a00cca54537c32cb36a2",
+    "effectiveSettings": {
+      "kdf": "PBKDF2_HMAC_SHA512",
+      "iterations": 256000,
+      "pageSize": 4096,
+      "hmac": "HMAC_SHA512",
+      "useHMAC": true,
+      "plaintextHeaderSize": 0,
+      "tempStore": "MEMORY"
+    },
+    "reservedRawKeyPasswordFormats": "rejected for normal vaults; legacy read-only import supported",
+    "generatedSourceSHA256": {
+      "internal/cipher/sqlite3.c": "8cd2347d18886fee4651153fabeeeffb7cec008700987dab1c00261febc4220f",
+      "internal/cipher/sqlite3.h": "e36eb6ed4de77e56a633866a8f84ed339785662d0cf79cf099f420b638bf28ec"
+    }
+  },
+  "artifacts": [
+    {
+      "artifact": "Pass-macos-15",
+      "artifactId": 13638696646,
+      "binarySha256": "db82f1ad5df0e3d990f86cbcda3e0e79bce00f8e2e5f27315394a22e63c569a3",
+      "executableMode": "0o100755",
+      "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t15.8.2\nBuildVersion:\t\t24H232\narm64\ngo version go1.27.3 darwin/arm64\nXcode 16.4\nBuild version 16F6",
+      "provider": "commoncrypto",
+      "nativeUIAssertions": true,
+      "goBinaryAdvisoryScan": "No vulnerabilities found."
+    },
+    {
+      "artifact": "Pass-macos-15-intel",
+      "artifactId": 13638383916,
+      "binarySha256": "cec8c4579eef5d57330ba9beb2580e3021a8dc64550ad5c655b84b94b7754bbc",
+      "executableMode": "0o100755",
+      "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830\nx86_64\ngo version go1.27.3 darwin/amd64\nXcode 16.4\nBuild version 16F6",
+      "provider": "commoncrypto",
+      "nativeUIAssertions": true,
+      "goBinaryAdvisoryScan": "No vulnerabilities found."
+    },
+    {
+      "artifact": "Pass-macos-26",
+      "artifactId": 13637579688,
+      "binarySha256": "27b7796cfa8b400906fee3761dd9b4f31d0cdd96c9d35e46d49facc0fc2c106e",
+      "executableMode": "0o100755",
+      "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t26.7.2\nBuildVersion:\t\t25G332\narm64\ngo version go1.27.3 darwin/arm64\nXcode 26.6\nBuild version 17F113",
+      "provider": "commoncrypto",
+      "nativeUIAssertions": true,
+      "goBinaryAdvisoryScan": "No vulnerabilities found."
+    },
+    {
+      "artifact": "Pass-macos-26-intel",
+      "artifactId": 13638233046,
+      "binarySha256": "49d6d9aa6665ee41c985257f53a1e5b529c5a647248747161b13412e3296094c",
+      "executableMode": "0o100755",
+      "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.1\nBuildVersion:\t\t25G76\nx86_64\ngo version go1.27.3 darwin/amd64\nXcode 26.6\nBuild version 17F113",
+      "provider": "commoncrypto",
+      "nativeUIAssertions": true,
+      "goBinaryAdvisoryScan": "No vulnerabilities found."
+    }
+  ],
+  "scope": "Synthetic-data implementation tests and adversary-agent review; ad-hoc signed builds. No paid human audit, Apple notarization or future-beta claim."
+}

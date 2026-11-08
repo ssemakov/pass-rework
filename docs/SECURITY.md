@@ -33,7 +33,7 @@ The build sets `SQLITE_HAS_CODEC`, SQLCipher initialization/shutdown hooks, `SQL
 5. **Data safety:** real driver-produced legacy/profile-3/profile-4 fixtures exercise every-field verification, original-backup byte preservation, sequence and 64-bit round trips, killed migration restart, standard SQLite recovery of a killed edit, backup/restore and old/new-password behavior after rotation.
 6. **Shipping artifact:** `check-artifact.sh` records native linkage, symbols, build tags/module metadata and SHA-256; rejects undefined SQLite storage calls; requires the bundled key API; and verifies the macOS signature. `govulncheck` scans the packaged executable. Native WebKit assertions exercise the production frontend/bridge and native clipboard in a separate synthetic test app; its test hooks are absent from release binaries.
 
-Run commands and platform results are in [VALIDATION.md](VALIDATION.md). CI artifacts retain platform/toolchain details, native smoke output, binary metadata, linkage, symbols, hash and vulnerability-scan output. The tests use public synthetic passwords only. No real user vault was used.
+Run commands and platform results are in [VALIDATION.md](VALIDATION.md); the [permanent evidence manifest](evidence/2026-11-08.json) records the final tested source and all four native artifact hashes. CI artifacts retain platform/toolchain details, native smoke output, binary metadata, linkage, symbols, hash and vulnerability-scan output. The tests use public synthetic passwords only. No real user vault was used.
 
 ## Frontend, native bridge and lock
 

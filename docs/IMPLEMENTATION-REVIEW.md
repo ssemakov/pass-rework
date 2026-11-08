@@ -4,7 +4,7 @@ Reviewer: separate adversary agent `/root/implementation_adversary`, 2026-11-08.
 
 **Final source-review disposition: no unresolved blocking code findings.** The thirteen findings below were corrected and re-reviewed. This is an independent agent review with synthetic tests, not an external human audit or certification. A commissioned human audit is omitted from v1 as the owner requested.
 
-Reviewed the current implementation based on published snapshot `c8f5ed6c65c1095079e8e6dcff13c46ac1167217`, including its subsequent IR-13 raw-key-literal correction and regression tests. Final native validation is separate from source-review completion: the designated PR rerun will be recorded here after the IR-13 correction is published and all results are observed. The earlier complete native/browser matrix is recorded below; it must not be mistaken for validation of later code changes. See [VALIDATION.md](VALIDATION.md) for the final tested commit and results.
+Reviewed implementation commit `a54a9852f32adeba027046bc7a6d9b6ecd57e4bd`, including the IR-13 raw-key-literal correction and all retained regressions. Final [validation run 42533514896](https://github.com/ssemakov/pass-rework/actions/runs/42533514896) completed successfully for that exact source: browser plus macOS 15/26 on both Intel and Apple Silicon. The reviewer independently checked the run, all job conclusions and the native evidence described below. See [VALIDATION.md](VALIDATION.md) for artifact hashes and distribution evidence.
 
 ## Scope and binding requirements
 
@@ -56,11 +56,21 @@ Independent local final-source checks completed successfully:
 - Frontend Vitest: **3 tests passed**.
 - Independent deterministic rotation/lock overlay: passed, including reopening the final file with the new key after denying the session reopen.
 - Independent raw-key boundary/legacy conversion overlay: **passed in 0.662 s**, including a genuine caller-supplied-salt source demonstrating the upstream raw-key branch.
-- Static review of the seven-scenario browser suite, native assertions, negative encryption tests, real historical-driver fixture and distribution scripts. The implementer runs the full browser suite; the reviewer separately checked CI conclusions/log markers.
+- Repository `TestRawKey*` independently rerun under the race detector: **passed in 5.162 s**.
+- Static review of the seven-scenario browser suite, native assertions, negative encryption tests, real historical-driver fixture and distribution scripts. The reviewer additionally confirmed **7 browser tests passed** in the final CI log, including explicit empty-password replacement.
 
-Using read-only GitHub tools, the reviewer independently checked [run 42531608409](https://github.com/ssemakov/pass-rework/actions/runs/42531608409) at `96aca33f67f67cbab1f35ed085553a90b7afb819`: browser plus all four macOS 15/26 Intel/Apple Silicon jobs concluded success. Logs for native jobs `128886814209`, `128886814236`, `128886814259` and `128886814393` each contain **“Native WebKit smoke passed: explicit UI assertions complete”**. The jobs also passed native race tests, package/signature/linkage checks and packaged-binary vulnerability scans. A clean exit without that assertion marker is explicitly rejected by the smoke script.
+Using read-only GitHub tools, the reviewer independently checked final [run 42533514896](https://github.com/ssemakov/pass-rework/actions/runs/42533514896). Run metadata reports `completed` / `success` at exact head `a54a9852f32adeba027046bc7a6d9b6ecd57e4bd`, and all five jobs concluded success. Native logs independently confirm that source checkout, **“Native WebKit smoke passed: explicit UI assertions complete”**, CommonCrypto, all six expected profile settings (256,000 iterations, 4096-byte pages, HMAC enabled, zero-byte plaintext header, HMAC-SHA512 and PBKDF2-HMAC-SHA512), memory temporary storage, the passing pinned-configuration assertion, all six raw-key format regressions, and near-miss/rotation rejection tests.
 
-That matrix establishes real native behavior for its stated commit. The final per-handle profile enforcement, rotation race correction, raw-key restriction and latest UI/packaging changes require the superseding final run; pending evidence is not an unresolved source finding, and no later artifact is declared tested merely because its predecessor passed.
+| Target | Independently inspected native job |
+|---|---|
+| macOS 15 / Apple Silicon | [128892674157](https://github.com/ssemakov/pass-rework/actions/runs/42533514896/job/128892674157) |
+| macOS 15 / Intel | [128892674002](https://github.com/ssemakov/pass-rework/actions/runs/42533514896/job/128892674002) |
+| macOS 26 / Apple Silicon | [128892673774](https://github.com/ssemakov/pass-rework/actions/runs/42533514896/job/128892673774) |
+| macOS 26 / Intel | [128892674052](https://github.com/ssemakov/pass-rework/actions/runs/42533514896/job/128892674052) |
+
+The final native jobs also passed race tests, vet, bundle packaging, signature/linkage checks and packaged-binary vulnerability scans. Browser job [128892673999](https://github.com/ssemakov/pass-rework/actions/runs/42533514896/job/128892673999) passed all seven end-to-end scenarios. The smoke script rejects a clean exit without its explicit UI assertion marker; no predecessor's success was substituted for final-source evidence.
+
+That matrix establishes real native behavior for the stated final implementation commit, including per-handle profile enforcement, rotation admission correction, raw-key restriction and the final UI/packaging changes. Later implementation changes require fresh validation; documentation-only evidence updates do not change the tested application source.
 
 The historical fixture uses the original pinned Journeyapps/Knex path on Linux and reports SQLCipher 4.2.0/profile 4 despite the legacy compatibility-before-key call. Explicit profile-3 and profile-4 fixtures provide additional format coverage. This is stronger than a format assumption, but is not inspection of an original shipped macOS legacy binary.
 
