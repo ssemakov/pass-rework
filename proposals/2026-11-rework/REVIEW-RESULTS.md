@@ -39,3 +39,7 @@ Three separate adversary agents reviewed the options before presentation to the 
 ## Recommendation after review
 
 **Choose A for a bespoke macOS app; choose C if the goal is primarily a durable offline password manager with less software to maintain. Choose B if Linux/Windows support justifies owning the WebView/IPC boundary.** All satisfy the proposed portable-single-file model at design level, allowing transient encrypted save/journal artifacts. None currently has completed implementation-level storage proof. Do not migrate real data until the chosen path's gates pass.
+
+## Owner decision incorporated after review
+
+The owner agreed that migration restarts from the preserved, untouched encrypted backup. Every attempt creates a fresh encrypted destination and verifies every entry before success. Interrupted/incomplete destinations are discarded; no checkpoints or resume support. Normal edit/delete operations use SQLCipher/SQLite transactions and built-in recovery without custom recovery logic. The migration contract and E6 gate now reflect this simplification; it does not resolve the outstanding implementation evidence or select a product option.
