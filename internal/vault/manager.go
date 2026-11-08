@@ -199,13 +199,13 @@ func (m *Manager) openLocked(path string, key []byte) error {
 	m.native.Lock()
 	m.d = d
 	m.native.Unlock()
-	m.opened.Store(true)
 	m.activeEpoch = openingEpoch
 	m.loc = loc
 	m.identity = after
 	m.owner = owner
 	m.key = append([]byte(nil), key...)
 	m.last.Store(time.Since(m.since).Nanoseconds())
+	m.opened.Store(true)
 	ok = true
 	return nil
 }
@@ -482,13 +482,12 @@ func (m *Manager) Rotate(token string, oldKey, newKey []byte) (rollback string, 
 	}
 	m.closeLocked()
 	m.clearClipboard()
-	m.admit.Lock()
-	m.epoch.Add(1)
-	m.admit.Unlock()
 	if e = m.openLocked(path, newKey); e != nil {
 		return rollback, e
 	}
-	return rollback, nil
+	// Reuse authentication admission: a Lock/Close admitted during replacement
+	// must not be superseded by rotation reopening under a newer generation.
+	return rollback, m.finishOpen(token)
 }
 
 func (m *Manager) PreserveBackup(source, destination string, key []byte, expected string) error {

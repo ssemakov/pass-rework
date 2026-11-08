@@ -33,7 +33,8 @@ jobs:
         working-directory: frontend
       - run: npm run build && npm test
         working-directory: frontend
-      - run: go test -race -tags production ./...
+      - run: go test -race -v -tags production ./... 2>&1 | tee artifacts/go-tests.txt
+      - run: go vet -tags production ./...
       - run: ./scripts/native-smoke.sh
       - run: ./scripts/package-macos.sh
       - run: ./scripts/check-artifact.sh build/Pass.app/Contents/MacOS/Pass
@@ -42,7 +43,7 @@ jobs:
         with:
           name: Pass-${{ matrix.os }}
           path: |
-            build/Pass.app
+            build/Pass-macos-*.zip
             artifacts/
   browser:
     runs-on: ubuntu-latest

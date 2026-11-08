@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -132,8 +134,28 @@ func TestPinnedEngineConfiguration(t *testing.T) {
 		t.Log(pragma, r)
 	}
 	r, e := d.Query("PRAGMA cipher_settings")
-	if e != nil || len(r) == 0 {
-		t.Fatal("missing cipher settings")
+	expected := [][]cipher.Value{
+		{cipher.S("PRAGMA kdf_iter = 256000;")},
+		{cipher.S("PRAGMA cipher_page_size = 4096;")},
+		{cipher.S("PRAGMA cipher_use_hmac = 1;")},
+		{cipher.S("PRAGMA cipher_plaintext_header_size = 0;")},
+		{cipher.S("PRAGMA cipher_hmac_algorithm = HMAC_SHA512;")},
+		{cipher.S("PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA512;")},
+	}
+	if e != nil || !reflect.DeepEqual(r, expected) {
+		t.Fatal("unexpected cipher settings", r, e)
+	}
+	provider := "openssl"
+	if runtime.GOOS == "darwin" {
+		provider = "commoncrypto"
+	}
+	r, e = d.Query("PRAGMA cipher_provider")
+	if e != nil || !reflect.DeepEqual(r, [][]cipher.Value{{cipher.S(provider)}}) {
+		t.Fatal("unexpected crypto provider", r, e)
+	}
+	r, e = d.Query("PRAGMA temp_store")
+	if e != nil || !reflect.DeepEqual(r, [][]cipher.Value{{cipher.I(2)}}) {
+		t.Fatal("temporary storage must be memory", r, e)
 	}
 }
 

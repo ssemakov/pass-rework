@@ -107,6 +107,28 @@ func Open(path string, key []byte, profile int, readOnly bool) (*DB, error) {
 	if e != nil || len(status) != 1 || status[0][0].Kind != Text || status[0][0].Text != "1" {
 		return nil, ErrCipher
 	}
+	// Read back the effective profile on every handle. Unknown pragmas or an
+	// accidental default change must fail before any sensitive read or write.
+	settings, e := d.Query("PRAGMA cipher_settings")
+	expected := []string{
+		"PRAGMA kdf_iter = 256000;", "PRAGMA cipher_page_size = 4096;",
+		"PRAGMA cipher_use_hmac = 1;", "PRAGMA cipher_plaintext_header_size = 0;",
+		"PRAGMA cipher_hmac_algorithm = HMAC_SHA512;", "PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA512;",
+	}
+	if profile == 3 {
+		expected[0] = "PRAGMA kdf_iter = 64000;"
+		expected[1] = "PRAGMA cipher_page_size = 1024;"
+		expected[4] = "PRAGMA cipher_hmac_algorithm = HMAC_SHA1;"
+		expected[5] = "PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA1;"
+	}
+	if e != nil || len(settings) != len(expected) {
+		return nil, ErrCipher
+	}
+	for i, row := range settings {
+		if len(row) != 1 || row[0].Kind != Text || row[0].Text != expected[i] {
+			return nil, ErrCipher
+		}
+	}
 	if _, e = d.Query("SELECT count(*) FROM sqlite_schema"); e != nil {
 		return nil, ErrKey
 	}

@@ -11,7 +11,10 @@ cat > build/Pass.app/Contents/Info.plist <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>Pass</string><key>CFBundleIdentifier</key><string>io.ssemakov.pass-rework</string><key>CFBundleName</key><string>Pass</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0.0</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>15.0</string><key>NSHighResolutionCapable</key><true/><key>NSRequiresAquaSystemAppearance</key><false/></dict></plist>
 PLIST
-# Local/CI builds are ad-hoc signed. A supplied identity enables proper signing.
-# Notarization is a separate release step requiring the owner's Apple credentials.
-codesign --force --deep --sign "${PASS_SIGN_IDENTITY:--}" --options runtime --timestamp=none build/Pass.app
+# Local/CI builds are ad-hoc signed. Developer ID releases use a secure timestamp.
+timestamp=--timestamp
+if [ "${PASS_SIGN_IDENTITY:--}" = - ]; then timestamp=--timestamp=none; fi
+codesign --force --deep --sign "${PASS_SIGN_IDENTITY:--}" --options runtime "$timestamp" build/Pass.app
 codesign --verify --strict --deep build/Pass.app
+# ZIP retains executable permissions and bundle metadata through CI downloads.
+ditto -c -k --sequesterRsrc --keepParent build/Pass.app "build/Pass-macos-$(uname -m).zip"
