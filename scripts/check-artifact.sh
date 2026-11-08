@@ -4,7 +4,7 @@ binary=${1:?binary required}
 mkdir -p artifacts
 go version -m "$binary" > artifacts/go-build-info.txt
 shasum -a 256 "$binary" > artifacts/binary-sha256.txt
-if grep -E 'mcp|devtools|purego|debug|server' artifacts/go-build-info.txt; then echo 'Forbidden release build tags'; exit 1; fi
+if grep -E 'mcp|devtools|purego|debug|server|native_smoke|e2e' artifacts/go-build-info.txt; then echo 'Forbidden release build tags'; exit 1; fi
 if [ "$(uname -s)" = Darwin ]; then
  otool -L "$binary" >artifacts/linkage.txt
  # WebKit/AppKit may themselves depend on system SQLite; this executable's

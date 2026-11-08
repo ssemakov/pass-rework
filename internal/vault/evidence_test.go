@@ -112,3 +112,26 @@ func TestLiveRollbackJournalContainsNoPlaintext(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestPinnedEngineConfiguration(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "engine.pass")
+	if e := newVault(p, testKey); e != nil {
+		t.Fatal(e)
+	}
+	d, e := cipher.Open(p, testKey, 4, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer d.Close()
+	for _, pragma := range []string{"cipher_version", "cipher_provider", "cipher_provider_version", "cipher_settings", "temp_store"} {
+		r, e := d.Query("PRAGMA " + pragma)
+		if e != nil {
+			t.Fatal(e)
+		}
+		t.Log(pragma, r)
+	}
+	r, e := d.Query("PRAGMA cipher_settings")
+	if e != nil || len(r) == 0 {
+		t.Fatal("missing cipher settings")
+	}
+}

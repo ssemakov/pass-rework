@@ -27,18 +27,23 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - run: mkdir -p artifacts && (sw_vers; uname -m; go version; xcodebuild -version) > artifacts/platform.txt
       - run: ./scripts/prepare-sqlcipher.sh
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: frontend
       - run: npm run build && npm test
         working-directory: frontend
       - run: go test -race -tags production ./...
+      - run: ./scripts/native-smoke.sh
       - run: ./scripts/package-macos.sh
       - run: ./scripts/check-artifact.sh build/Pass.app/Contents/MacOS/Pass
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -mode=binary build/Pass.app/Contents/MacOS/Pass > artifacts/go-vulnerability-scan.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Pass-${{ matrix.os }}
-          path: build/Pass.app
+          path: |
+            build/Pass.app
+            artifacts/
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 20

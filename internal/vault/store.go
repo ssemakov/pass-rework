@@ -1,11 +1,13 @@
 package vault
 
 import (
+	"encoding/hex"
 	"errors"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ssemakov/pass-rework/internal/cipher"
 )
@@ -47,7 +49,7 @@ type Patch struct {
 
 func (i Input) validate() error {
 	for _, s := range []*string{i.Name, i.Login, i.Password, i.URL} {
-		if s != nil && len(*s) > 1024*1024 {
+		if s != nil && (len(*s) > 1024*1024 || !utf8.ValidString(*s)) {
 			return ErrInput
 		}
 	}
@@ -55,7 +57,7 @@ func (i Input) validate() error {
 }
 func integer(s string) (int64, error) {
 	n, e := strconv.ParseInt(s, 10, 64)
-	if e != nil || strconv.FormatInt(n, 10) != s || n < 1 {
+	if e != nil || strconv.FormatInt(n, 10) != s {
 		return 0, ErrInput
 	}
 	return n, nil
@@ -137,14 +139,14 @@ func schema(d *cipher.DB, current bool) error {
 		return e
 	}
 	for _, r := range data {
-		if r[0].Kind != cipher.Integer || r[0].Int < 1 {
+		if r[0].Kind != cipher.Integer {
 			return ErrFormat
 		}
 		for i := 1; i < 7; i++ {
 			if r[i].Kind == cipher.Null {
 				continue
 			}
-			if i <= 4 && r[i].Kind != cipher.Text || i >= 5 && r[i].Kind != cipher.Integer {
+			if i <= 4 && (r[i].Kind != cipher.Text || !utf8.ValidString(r[i].Text)) || i >= 5 && r[i].Kind != cipher.Integer {
 				return ErrFormat
 			}
 		}
@@ -160,6 +162,9 @@ func schema(d *cipher.DB, current bool) error {
 		}
 		m, e := d.Query("SELECT format,uuid FROM pass_meta")
 		if e != nil || len(m) != 1 || m[0][0].Text != "pass-rework-v1" || len(m[0][1].Text) != 32 {
+			return ErrFormat
+		}
+		if _, e = hex.DecodeString(m[0][1].Text); e != nil {
 			return ErrFormat
 		}
 		v, e = d.Query("SELECT count(*) FROM login_items LEFT JOIN item_versions USING(id) WHERE revision IS NULL OR typeof(revision)!='integer' OR revision<1")
@@ -231,7 +236,7 @@ func update(d *cipher.DB, id string, p Patch) (Entry, error) {
 		return Entry{}, e
 	}
 	rev, e := integer(p.Revision)
-	if e != nil || rev == 1<<63-1 {
+	if e != nil || rev < 1 || rev == 1<<63-1 {
 		return Entry{}, ErrInput
 	}
 	e = d.Transaction(func() error {
@@ -262,8 +267,8 @@ func remove(d *cipher.DB, id, revision string) error {
 		return e
 	}
 	rev, e := integer(revision)
-	if e != nil {
-		return e
+	if e != nil || rev < 1 {
+		return ErrInput
 	}
 	return d.Transaction(func() error {
 		c, e := d.Exec("DELETE FROM login_items WHERE id=? AND EXISTS(SELECT 1 FROM item_versions WHERE id=? AND revision=?)", cipher.I(n), cipher.I(n), cipher.I(rev))

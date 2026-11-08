@@ -52,6 +52,9 @@ func run() error {
 	})
 	defer manager.Close()
 	picker := func(purpose string) (string, error) {
+		if smokeEnabled {
+			return smokePick(purpose)
+		}
 		switch purpose {
 		case "open", "source":
 			return app.Dialog.OpenFile().SetTitle("Select encrypted vault or backup").AttachToWindow(window).PromptForSingleSelection()
@@ -69,6 +72,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	assetHandler := smokeHandler(application.BundledAssetFileServer(sub), capability, func() string {
+		if window == nil {
+			return ""
+		}
+		return strconv.FormatUint(uint64(window.ID()), 10)
+	})
 	app = application.New(application.Options{
 		Name: "Pass", Description: "Offline encrypted password vault",
 		Flags:    map[string]any{"vaultCapability": capability},
@@ -79,7 +88,7 @@ func run() error {
 		PanicHandler: func(*application.PanicDetails) { os.Exit(1) },
 		MarshalError: func(err error) []byte { b, _ := json.Marshal(err.Error()); return b },
 		ErrorHandler: func(error) {}, WarningHandler: func(string) {},
-		Assets: application.AssetOptions{Handler: application.BundledAssetFileServer(sub), Middleware: func(next http.Handler) http.Handler {
+		Assets: application.AssetOptions{Handler: assetHandler, Middleware: func(next http.Handler) http.Handler {
 			return service.SecureAssets(next, capability, func() string {
 				if window == nil {
 					return ""
@@ -97,5 +106,7 @@ func run() error {
 		app.Event.OnApplicationEvent(event, func(*application.ApplicationEvent) { go manager.Lock() })
 	}
 	window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) { go manager.Lock() })
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { desktop.DisableRestoration() })
+	installSmoke(app, window, manager)
 	return app.Run()
 }

@@ -8,3 +8,5 @@ long long pass_clip_write(const void *bytes,long long len){@autoreleasepool{
 void pass_clip_clear(long long token){@autoreleasepool{NSPasteboard *p=[NSPasteboard generalPasteboard];if([p changeCount]==token)[p clearContents];}}
 
 void pass_clip_clear_last(void){pass_clip_clear(lastOwned);lastOwned=0;}
+
+void pass_disable_restoration(void){@autoreleasepool{for(NSWindow *window in [NSApp windows]){if([window isKindOfClass:NSClassFromString(@"WebviewWindow")])[window setRestorable:NO];}[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"NSQuitAlwaysKeepsWindows"];}}

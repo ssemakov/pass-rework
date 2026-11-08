@@ -46,7 +46,8 @@ func (f *Facade) take(token, purpose string) (string, error) {
 	if !ok || s.purpose != purpose || s.generation != f.manager.Generation() {
 		return "", ErrDenied
 	}
-	delete(f.selected, token)
+	// Grants remain reusable for retry within this exact generation. Fresh-output
+	// filesystem operations still refuse to overwrite a completed destination.
 	return s.path, nil
 }
 func (f *Facade) Choose(ctx context.Context, purpose string) (Selection, error) {

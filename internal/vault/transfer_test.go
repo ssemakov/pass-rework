@@ -265,7 +265,7 @@ func TestImportCrashChild(t *testing.T) {
 	_, _ = importChecked(os.Getenv("PASS_TEST_BACKUP"), os.Getenv("PASS_TEST_DEST"), testKey, testKey, func() bool {
 		n++
 		if n == 2 {
-			select {}
+			time.Sleep(time.Hour)
 		}
 		return true
 	})
@@ -296,13 +296,57 @@ func TestKilledImportRestartsFromBackup(t *testing.T) {
 	if !found {
 		t.Fatal("no interrupted transaction observed")
 	}
-	child.Process.Kill()
+	if e := child.Process.Kill(); e != nil {
+		t.Fatal("child not alive at interruption", e)
+	}
 	child.Wait()
+	if child.ProcessState.ExitCode() != -1 {
+		t.Fatal("child was not signal-interrupted")
+	}
 	if _, e := Import(src, dst, testKey, testKey); e != nil {
 		t.Fatal("fresh restart failed", e)
 	}
 	after, _ := os.ReadFile(src)
 	if sha256.Sum256(after) != hash {
 		t.Fatal("original encrypted backup changed")
+	}
+}
+
+func TestSignedIDsAndUnsupportedText(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "legacy.pass")
+	legacyFixture(t, src, 4)
+	d, e := cipher.Open(src, testKey, 4, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = d.Exec("INSERT INTO login_items(id,name) VALUES(-1,'negative id'),(0,'zero id')"); e != nil {
+		t.Fatal(e)
+	}
+	d.Close()
+	dst := filepath.Join(dir, "new.pass")
+	if n, e := Import(src, dst, testKey, testKey); e != nil || n != 4 {
+		t.Fatal("signed IDs lost", n, e)
+	}
+	m := New(nil, nil)
+	defer m.Close()
+	if e = m.Unlock(dst, testKey); e != nil {
+		t.Fatal(e)
+	}
+	if r, e := m.Get(m.Generation(), "-1"); e != nil || r.ID != "-1" {
+		t.Fatal("negative ID unavailable", e)
+	}
+	if r, e := m.Get(m.Generation(), "0"); e != nil || r.ID != "0" {
+		t.Fatal("zero ID unavailable", e)
+	}
+	m.Lock()
+	d, e = cipher.Open(src, testKey, 4, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	d.Exec("UPDATE login_items SET name=? WHERE id=0", cipher.S(string([]byte{0xff})))
+	d.Close()
+	if _, e = Import(src, filepath.Join(dir, "unsupported.pass"), testKey, testKey); e == nil {
+		t.Fatal("unrepresentable UTF-8 text accepted")
 	}
 }

@@ -165,9 +165,11 @@ func (d *DB) statement(sql string, args []Value) (*C.sqlite3_stmt, error) {
 			if len(v.Text) > 8*1024*1024 {
 				return fail()
 			}
-			b := C.CBytes([]byte(v.Text))
+			var b unsafe.Pointer
 			if len(v.Text) == 0 {
 				b = C.malloc(1)
+			} else {
+				b = C.CBytes([]byte(v.Text))
 			}
 			rc = C.pass_bind(st, C.int(i+1), b, C.int(len(v.Text)))
 			C.pass_clear(b, C.size_t(len(v.Text)))

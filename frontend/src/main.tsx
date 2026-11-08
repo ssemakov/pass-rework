@@ -1,60 +1,1107 @@
-import React,{createContext,useContext,useCallback,useEffect,useRef,useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {call,onLock,message,type Entry,type Status,type Selection,type Input,type Patch} from './api';
-import {SessionFence} from './fence';
-import './style.css';
-const Feedback=createContext({error:'',notice:''});
-const empty:Input={name:'',login:'',password:'',url:''};
-function App(){
- const [status,setStatus]=useState<Status>({locked:true,generation:'',label:'',idleMinutes:5});
- const [entries,setEntries]=useState<Entry[]>([]),[search,setSearch]=useState('');
- const [selected,setSelected]=useState<string|null>(null),[revealed,setRevealed]=useState<string|null>(null);
- const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
- const [panel,setPanel]=useState<'unlock'|'create'|'import'|'rotate'|'settings'|null>(null);
- const [selection,setSelection]=useState<Selection|null>(null),[source,setSource]=useState<Selection|null>(null),[destination,setDestination]=useState<Selection|null>(null);
- const [password,setPassword]=useState(''),[nextPassword,setNextPassword]=useState(''),[confirmation,setConfirmation]=useState('');
- const [editing,setEditing]=useState<Entry|null|undefined>(undefined),[draft,setDraft]=useState<Input>(empty),[replacePassword,setReplacePassword]=useState(false),[deleting,setDeleting]=useState<Entry|null>(null);
- const fence=useRef(new SessionFence()),searchSerial=useRef(0),revealSerial=useRef(0),statusRef=useRef(status);statusRef.current=status;
- const conceal=useCallback(()=>{revealSerial.current++;setRevealed(null)},[]);
- const scrub=useCallback(()=>{fence.current.invalidate();setEntries([]);conceal();setSelected(null);setEditing(undefined);setDraft(empty);setPassword('');setNextPassword('');setConfirmation('');setSelection(null);setSource(null);setDestination(null);setPanel(null);setDeleting(null);setBusy(false);setError('');setSearch('');statusRef.current={...statusRef.current,locked:true};setStatus(statusRef.current);},[conceal]);
- const updateState=useCallback(async()=>{const g=fence.current.capture();const current=await call<Status>('State');if(!fence.current.accepts(g)||BigInt(current.generation)<BigInt(statusRef.current.generation||'0'))return;if(current.locked||current.generation!==statusRef.current.generation){scrub()}statusRef.current=current;setStatus(current)},[scrub]);
- useEffect(()=>{let active=true,polling=false;let dispose=()=>{};void onLock((generation)=>{if(active&&BigInt(generation)>=BigInt(statusRef.current.generation||'0')){scrub();statusRef.current={...statusRef.current,generation};setStatus(statusRef.current)}}).then(d=>{if(active)dispose=d;else d()});void updateState().catch(()=>setError('Unable to connect to the vault service.'));const t=setInterval(()=>{if(polling)return;polling=true;const g=fence.current.capture();void call<Status>('State').then(s=>{if(!active||!fence.current.accepts(g)||BigInt(s.generation)<BigInt(statusRef.current.generation||'0'))return;if(s.locked&&!statusRef.current.locked||s.generation!==statusRef.current.generation){scrub();statusRef.current=s;setStatus(s)}}).catch(()=>{}).finally(()=>{polling=false})},1000);return()=>{active=false;dispose();clearInterval(t)}},[scrub,updateState]);
- const run=async<T,>(task:(check:()=>void)=>Promise<T>,success?:(value:T)=>void)=>{const g=fence.current.capture();setBusy(true);setError('');setNotice('');try{const check=()=>{if(!fence.current.accepts(g))throw new Error("Session changed")};const result=await task(check);if(fence.current.accepts(g))success?.(result)}catch(e){if(fence.current.accepts(g))setError(message(e))}finally{if(fence.current.accepts(g))setBusy(false)}};
- const refresh=useCallback(async()=>{const s=statusRef.current;if(s.locked)return;const n=++searchSerial.current,g=fence.current.capture();try{const list=await call<Entry[]>('List',s.generation,search);if(n===searchSerial.current&&fence.current.accepts(g))setEntries(list)}catch(e){if(fence.current.accepts(g))setError(message(e))}},[search]);
- useEffect(()=>{if(!status.locked)void refresh()},[refresh,status.locked,status.generation]);
- useEffect(()=>{if(status.locked)return;let last=0;const activity=()=>{if(Date.now()-last>10000){last=Date.now();void call('Activity',statusRef.current.generation).catch(()=>{})}};window.addEventListener('keydown',activity);window.addEventListener('pointerdown',activity);return()=>{window.removeEventListener('keydown',activity);window.removeEventListener('pointerdown',activity)}},[status.locked]);
- const lock=()=>{scrub();void call('Lock').catch(()=>setError('Could not complete lock. Quit Pass to close the vault.'))};
- useEffect(()=>{const keyboard=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='l'){e.preventDefault();lock()}if(e.key==='Escape'&&!busy){conceal();setEditing(undefined);setDraft(empty);setPanel(null);setPassword('');setNextPassword('');setConfirmation('');setDeleting(null)}};window.addEventListener('keydown',keyboard);return()=>window.removeEventListener('keydown',keyboard)});
- const choose=async(purpose:string,set:(s:Selection)=>void)=>{await run(()=>call<Selection>('Choose',purpose),set)};
- const openPanel=(p:typeof panel)=>{setPanel(p);setSelection(null);setSource(null);setDestination(null);setPassword('');setNextPassword('');setConfirmation('');setError('');setNotice('');conceal()};
- const authenticate=(e:React.FormEvent)=>{e.preventDefault();if(!selection)return;const creating=panel==='create';if(creating&&password!==confirmation){setError('The passwords do not match.');return}void run(()=>call(creating?'Create':'Unlock',selection.token,password),()=>{fence.current.invalidate();setBusy(false);setPassword('');setConfirmation('');setSelection(null);setPanel(null);void updateState()})};
- const row=entries.find(e=>e.id===selected);
- const startEdit=(entry:Entry|null)=>{conceal();setEditing(entry);setDraft(entry?{name:entry.name,login:entry.login,url:entry.url,password:null}:{...empty});setReplacePassword(!entry);setError('')};
- const save=(e:React.FormEvent)=>{e.preventDefault();const original=editing;void run(()=>original?call<Entry>('Update',status.generation,original.id,{...draft,replacePassword,revision:original.revision} satisfies Patch):call<Entry>('CreateEntry',status.generation,draft),result=>{setEditing(undefined);setDraft(empty);setSelected(result.id);setNotice('Entry saved.');void refresh()})};
- const copy=(field:string)=>{if(!row)return;void run(()=>call('Copy',status.generation,row.id,field),()=>setNotice('Copied. Pass will clear its clipboard content after 30 seconds.'))};
- const reveal=()=>{if(!row)return;if(revealed!==null){conceal();return}const nonce=++revealSerial.current;void run(()=>call<Entry>('Get',status.generation,row.id),entry=>{if(nonce===revealSerial.current)setRevealed(entry.password??'')})};
- const backup=()=>void run(async(check)=>{const picked=await call<Selection>('Choose','backup');check();return call('Backup',status.generation,picked.token)},()=>setNotice('Encrypted backup saved and verified.'));
- const rotate=(e:React.FormEvent)=>{e.preventDefault();if(nextPassword!==confirmation){setError('The new passwords do not match.');return}void run(()=>call<string>('Rotate',status.generation,password,nextPassword),rollback=>{fence.current.invalidate();setBusy(false);setPassword('');setNextPassword('');setConfirmation('');setPanel(null);void updateState().then(()=>setNotice('Master password changed. Your encrypted old-password backup is preserved at '+rollback))})};
- const importBackup=(e:React.FormEvent)=>{e.preventDefault();if(!source||!destination)return;if(nextPassword!==confirmation){setError('The new passwords do not match.');return}void run(()=>call<number>('Import',source.token,destination.token,password,nextPassword),count=>{setPassword('');setNextPassword('');setConfirmation('');setSource(null);setDestination(null);setNotice(`Verified all ${count} entries. Open the new vault to continue.`);setPanel(null)})};
- const preserve=()=>{if(!password){setError('Enter the original master password first.');return}void run(async(check)=>{const src=await call<Selection>('Choose','source');check();const dst=await call<Selection>('Choose','backup');check();return call('PreserveBackup',src.token,dst.token,password)},()=>{setPassword('');setSource(null);setNotice('Encrypted backup preserved and verified. Select that backup below to import.')})};
- const passwordFields=(newVault=false)=><><label>{newVault?'Master password':'Current master password'}<input type="password" autoComplete="off" required value={password} onChange={e=>setPassword(e.target.value)} /></label>{newVault&&<label>Confirm master password<input type="password" autoComplete="off" required value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></label>}</>;
- return <Feedback.Provider value={{error,notice}}><div className="app"><header><div className="brand"><span className="brandmark" aria-hidden>p</span><div><h1>Pass</h1><span className="subtle">A quiet place for your passwords</span></div></div><div className="header-actions"><span className={'status '+(status.locked?'':'unlocked')}>{status.locked?'Locked':'Unlocked'}</span>{!status.locked&&<button className="outline" onClick={lock}>Lock vault <kbd>⌘ L</kbd></button>}</div></header>
- <div className="messages" aria-live="polite" hidden={!!panel||editing!==undefined||!!deleting}>{error&&<div role="alert" className="error">{error}</div>}{notice&&<div role="status" className="notice">{notice}</div>}</div>
- {status.locked?<main className="welcome"><div className="eyebrow">LOCAL. PRIVATE. YOURS.</div><h2>Your secrets,<br/>under your control.</h2><p>One encrypted vault. One master password.<br/>Everything stays on your computer.</p><div className="welcome-actions"><button className="primary" disabled={busy} onClick={()=>openPanel('unlock')}>Open vault <span aria-hidden>↗</span></button><button className="outline" disabled={busy} onClick={()=>openPanel('create')}>Create a vault</button></div><button className="text" disabled={busy} onClick={()=>openPanel('import')}>Import or restore an encrypted backup →</button><div className="local-note"><span aria-hidden>◎</span> No account. No cloud. No subscriptions.</div></main>:<main className="workspace"><aside><div className="vault-heading"><div><div className="eyebrow">YOUR VAULT</div><h2 title={status.label}>{status.label}</h2></div><button className="icon" aria-label="Vault settings" onClick={()=>openPanel('settings')}>⚙</button></div><label className="search"><span className="sr-only">Search entries</span><input placeholder="Search your vault" value={search} onChange={e=>{setSearch(e.target.value);conceal()}}/></label><div className="list-heading"><span>{entries.length} {entries.length===1?'entry':'entries'}</span><button className="text" disabled={busy} onClick={()=>startEdit(null)}>+ New entry</button></div><div className="entry-list" aria-label="Entries">{entries.map(entry=><button className={'entry '+(entry.id===selected?'active':'')} key={entry.id} onClick={()=>{setSelected(entry.id);conceal()}}><span className="entry-avatar" aria-hidden>{(entry.name||'?').slice(0,1).toUpperCase()}</span><span><strong>{entry.name||'Untitled entry'}</strong><small>{entry.login||entry.url||'No username'}</small></span><span className="chevron" aria-hidden>›</span></button>)}{entries.length===0&&<div className="empty-list">{search?'No matching entries.':'Your vault is ready. Add your first entry.'}</div>}</div><div className="aside-footer"><button className="text" disabled={busy} onClick={backup}>Save encrypted backup</button><span className="subtle">Auto-lock: {status.idleMinutes} min</span></div></aside><section className="detail" aria-label="Entry details">{row?<><div className="detail-top"><span className="large-avatar" aria-hidden>{(row.name||'?').slice(0,1).toUpperCase()}</span><div><span className="eyebrow">LOGIN</span><h2>{row.name||'Untitled entry'}</h2></div></div><div className="fields"><div><span className="field-label">USERNAME</span><div className="field-value"><span>{row.login??'Not set'}</span><button className="text" disabled={busy||row.login===null} onClick={()=>copy('login')}>Copy username</button></div></div><div><span className="field-label">PASSWORD</span><div className="field-value"><span className="secret" aria-label={revealed===null?'Password hidden':'Revealed password'}>{revealed===null?'••••••••••••':revealed}</span><div><button className="text" disabled={busy} onClick={reveal}>{revealed===null?'Reveal password':'Hide password'}</button><button className="text" disabled={busy} onClick={()=>copy('password')}>Copy password</button></div></div></div><div><span className="field-label">WEBSITE</span><div className="field-value"><span>{row.url??'Not set'}</span><button className="text" disabled={busy||row.url===null} onClick={()=>copy('url')}>Copy website</button></div></div></div><div className="detail-actions"><button className="primary" disabled={busy} onClick={()=>startEdit(row)}>Edit entry</button><button className="text danger" disabled={busy} onClick={()=>setDeleting(row)}>Delete entry</button></div><p className="subtle">Passwords stay hidden until you choose to reveal them.</p></>:<div className="empty-detail"><div className="empty-symbol" aria-hidden>◎</div><h2>{entries.length?'A little peace of mind.':'Make yourself at home.'}</h2><p>{entries.length?'Select an entry to see its details.':'Start with a login you want to keep safe.'}</p><button className="outline" onClick={()=>startEdit(null)}>+ New entry</button></div>}</section></main>}
- <footer><span>Pass · Offline password manager</span><span>Your vault travels as one encrypted file.</span></footer>
- {panel&&<Modal title={{unlock:'Open your vault',create:'Create your vault',import:'Import an encrypted backup',rotate:'Change master password',settings:'Vault settings'}[panel]} close={()=>openPanel(null)} busy={busy}>
- {(panel==='unlock'||panel==='create')&&<form onSubmit={authenticate}><p className="subtle">{panel==='create'?'Choose a fresh vault file and a master password you can remember. There is no password reset.':'Select your vault and enter its master password.'}</p><button type="button" className="file-button" disabled={busy} onClick={()=>choose(panel==='create'?'create':'open',setSelection)}>{selection?.label??(panel==='create'?'Choose vault location':'Choose vault file')} <span aria-hidden>↗</span></button>{passwordFields(panel==='create')}<button className="primary full" disabled={busy||!selection||!password}>{busy?'Working…':panel==='create'?'Create vault':'Unlock vault'}</button></form>}
- {panel==='settings'&&<div className="settings"><label>Lock after inactivity<select value={status.idleMinutes} onChange={e=>void run(()=>call('SetIdle',status.generation,Number(e.target.value)),()=>void updateState())}><option value={1}>1 minute</option><option value={5}>5 minutes</option><option value={15}>15 minutes</option></select></label><button className="outline" onClick={()=>openPanel('rotate')}>Change master password</button><button className="outline" onClick={backup}>Save encrypted backup</button><p className="subtle">Copied credentials may be visible to clipboard tools and other devices. Avoid copying if that is a concern.</p></div>}
- {panel==='rotate'&&<form onSubmit={rotate}><p className="subtle">An encrypted backup protected by your old password will be kept. Store it carefully.</p>{passwordFields()}<label>New master password<input type="password" autoComplete="off" required value={nextPassword} onChange={e=>setNextPassword(e.target.value)}/></label><label>Confirm new master password<input type="password" autoComplete="off" required value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></label><button className="primary full" disabled={busy||!nextPassword}>{busy?'Verifying…':'Change password'}</button></form>}
- {panel==='import'&&<form onSubmit={importBackup}><p className="subtle">Close the old app first. Keep its original encrypted backup untouched. Every entry will be verified in a fresh destination. Interrupted imports start over.</p><label>Backup master password<input type="password" autoComplete="off" required value={password} onChange={e=>setPassword(e.target.value)}/></label><button type="button" className="text" disabled={busy} onClick={preserve}>Need a backup? Preserve the original first ↗</button><button type="button" className="file-button" disabled={busy} onClick={()=>choose('source',setSource)}>{source?.label??'Choose preserved encrypted backup'} ↗</button><button type="button" className="file-button" disabled={busy} onClick={()=>choose('destination',setDestination)}>{destination?.label??'Choose fresh destination'} ↗</button><label>New vault master password<input type="password" autoComplete="off" required value={nextPassword} onChange={e=>setNextPassword(e.target.value)}/></label><label>Confirm new vault master password<input type="password" autoComplete="off" required value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></label><button className="primary full" disabled={busy||!source||!destination||!nextPassword}>{busy?'Importing and verifying…':'Import and verify every entry'}</button></form>}
- </Modal>}
- {editing!==undefined&&<Modal title={editing?'Edit entry':'New entry'} close={()=>{setEditing(undefined);setDraft(empty)}} busy={busy}><form onSubmit={save}>{(['name','login','url'] as const).map(field=><label key={field}>{{name:'Entry name',login:'Username',url:'Website'}[field]}<input autoFocus={field==='name'} autoComplete="off" value={draft[field]??''} onChange={e=>setDraft({...draft,[field]:e.target.value})}/></label>)}{editing&&<label className="check"><input type="checkbox" checked={replacePassword} onChange={e=>{setReplacePassword(e.target.checked);setDraft({...draft,password:null})}}/>Replace password</label>}{(!editing||replacePassword)&&<label>Password<input type="password" autoComplete="off" value={draft.password??''} onChange={e=>setDraft({...draft,password:e.target.value})}/></label>}{editing&&!replacePassword&&<p className="subtle">Your existing password will stay unchanged.</p>}<div className="form-actions"><button type="button" className="outline" disabled={busy} onClick={()=>{setEditing(undefined);setDraft(empty)}}>Cancel</button><button className="primary" disabled={busy}>{busy?'Saving…':'Save entry'}</button></div></form></Modal>}
- {deleting&&<Modal title="Delete this entry?" close={()=>setDeleting(null)} busy={busy}><p>“{deleting.name||'Untitled entry'}” will be removed from this vault. Older encrypted backups may still contain it.</p><div className="form-actions"><button className="outline" disabled={busy} onClick={()=>setDeleting(null)}>Keep entry</button><button className="primary destructive" disabled={busy} onClick={()=>void run(()=>call('Delete',status.generation,deleting.id,deleting.revision),()=>{setDeleting(null);setSelected(null);conceal();setNotice('Entry deleted.');void refresh()})}>Delete entry</button></div></Modal>}
- </div></Feedback.Provider>
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { createRoot } from "react-dom/client";
+import {
+  call,
+  onLock,
+  message,
+  type Entry,
+  type Status,
+  type Selection,
+  type Input,
+  type Patch,
+} from "./api";
+import { SessionFence } from "./fence";
+import "./style.css";
+const Feedback = createContext({ error: "", notice: "" });
+const empty: Input = { name: "", login: "", password: "", url: "" };
+function App() {
+  const [status, setStatus] = useState<Status>({
+    locked: true,
+    generation: "",
+    label: "",
+    idleMinutes: 5,
+  });
+  const [entries, setEntries] = useState<Entry[]>([]),
+    [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<string | null>(null),
+    [revealed, setRevealed] = useState<string | null>(null);
+  const [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false);
+  const [panel, setPanel] = useState<
+    "unlock" | "create" | "import" | "rotate" | "settings" | null
+  >(null);
+  const [selection, setSelection] = useState<Selection | null>(null),
+    [source, setSource] = useState<Selection | null>(null),
+    [destination, setDestination] = useState<Selection | null>(null);
+  const [password, setPassword] = useState(""),
+    [nextPassword, setNextPassword] = useState(""),
+    [confirmation, setConfirmation] = useState("");
+  const [editing, setEditing] = useState<Entry | null | undefined>(undefined),
+    [draft, setDraft] = useState<Input>(empty),
+    [replacePassword, setReplacePassword] = useState(false),
+    [deleting, setDeleting] = useState<Entry | null>(null);
+  const fence = useRef(new SessionFence()),
+    searchSerial = useRef(0),
+    revealSerial = useRef(0),
+    statusRef = useRef(status);
+  statusRef.current = status;
+  const conceal = useCallback(() => {
+    revealSerial.current++;
+    setRevealed(null);
+  }, []);
+  const scrub = useCallback(() => {
+    fence.current.invalidate();
+    setEntries([]);
+    conceal();
+    setSelected(null);
+    setEditing(undefined);
+    setDraft(empty);
+    setPassword("");
+    setNextPassword("");
+    setConfirmation("");
+    setSelection(null);
+    setSource(null);
+    setDestination(null);
+    setPanel(null);
+    setDeleting(null);
+    setBusy(false);
+    setError("");
+    setSearch("");
+    statusRef.current = { ...statusRef.current, locked: true };
+    setStatus(statusRef.current);
+  }, [conceal]);
+  const updateState = useCallback(async () => {
+    const g = fence.current.capture();
+    const current = await call<Status>("State");
+    if (
+      !fence.current.accepts(g) ||
+      BigInt(current.generation) < BigInt(statusRef.current.generation || "0")
+    )
+      return;
+    if (current.locked || current.generation !== statusRef.current.generation) {
+      scrub();
+    }
+    statusRef.current = current;
+    setStatus(current);
+  }, [scrub]);
+  useEffect(() => {
+    let active = true,
+      polling = false;
+    let dispose = () => {};
+    void onLock((generation) => {
+      if (
+        active &&
+        BigInt(generation) >= BigInt(statusRef.current.generation || "0")
+      ) {
+        scrub();
+        statusRef.current = { ...statusRef.current, generation };
+        setStatus(statusRef.current);
+      }
+    }).then((d) => {
+      if (active) dispose = d;
+      else d();
+    });
+    void updateState().catch(() =>
+      setError("Unable to connect to the vault service."),
+    );
+    const t = setInterval(() => {
+      if (polling) return;
+      polling = true;
+      const g = fence.current.capture();
+      void call<Status>("State")
+        .then((s) => {
+          if (
+            !active ||
+            !fence.current.accepts(g) ||
+            BigInt(s.generation) < BigInt(statusRef.current.generation || "0")
+          )
+            return;
+          if (
+            (s.locked && !statusRef.current.locked) ||
+            s.generation !== statusRef.current.generation
+          ) {
+            scrub();
+            statusRef.current = s;
+            setStatus(s);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          polling = false;
+        });
+    }, 1000);
+    return () => {
+      active = false;
+      dispose();
+      clearInterval(t);
+    };
+  }, [scrub, updateState]);
+  const run = async <T,>(
+    task: (check: () => void) => Promise<T>,
+    success?: (value: T) => void,
+  ) => {
+    const g = fence.current.capture();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const check = () => {
+        if (!fence.current.accepts(g)) throw new Error("Session changed");
+      };
+      const result = await task(check);
+      if (fence.current.accepts(g)) success?.(result);
+    } catch (e) {
+      if (fence.current.accepts(g)) setError(message(e));
+    } finally {
+      if (fence.current.accepts(g)) setBusy(false);
+    }
+  };
+  const refresh = useCallback(async () => {
+    const s = statusRef.current;
+    if (s.locked) return;
+    const n = ++searchSerial.current,
+      g = fence.current.capture();
+    try {
+      const list = await call<Entry[]>("List", s.generation, search);
+      if (n === searchSerial.current && fence.current.accepts(g))
+        setEntries(list);
+    } catch (e) {
+      if (fence.current.accepts(g)) setError(message(e));
+    }
+  }, [search]);
+  useEffect(() => {
+    if (!status.locked) void refresh();
+  }, [refresh, status.locked, status.generation]);
+  useEffect(() => {
+    if (status.locked) return;
+    let last = 0;
+    const activity = () => {
+      if (Date.now() - last > 10000) {
+        last = Date.now();
+        void call("Activity", statusRef.current.generation).catch(() => {});
+      }
+    };
+    window.addEventListener("keydown", activity);
+    window.addEventListener("pointerdown", activity);
+    return () => {
+      window.removeEventListener("keydown", activity);
+      window.removeEventListener("pointerdown", activity);
+    };
+  }, [status.locked]);
+  const lock = () => {
+    scrub();
+    void call("Lock").catch(() =>
+      setError("Could not complete lock. Quit Pass to close the vault."),
+    );
+  };
+  useEffect(() => {
+    const keyboard = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        lock();
+      }
+      if (e.key === "Escape" && !busy) {
+        conceal();
+        setEditing(undefined);
+        setDraft(empty);
+        setPanel(null);
+        setPassword("");
+        setNextPassword("");
+        setConfirmation("");
+        setDeleting(null);
+      }
+    };
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  });
+  const choose = async (purpose: string, set: (s: Selection) => void) => {
+    await run(() => call<Selection>("Choose", purpose), set);
+  };
+  const openPanel = (p: typeof panel) => {
+    setPanel(p);
+    setSelection(null);
+    setSource(null);
+    setDestination(null);
+    setPassword("");
+    setNextPassword("");
+    setConfirmation("");
+    setError("");
+    setNotice("");
+    conceal();
+  };
+  const authenticate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selection) return;
+    const creating = panel === "create";
+    if (creating && password !== confirmation) {
+      setError("The passwords do not match.");
+      return;
+    }
+    void run(
+      () => call(creating ? "Create" : "Unlock", selection.token, password),
+      () => {
+        fence.current.invalidate();
+        setBusy(false);
+        setPassword("");
+        setConfirmation("");
+        setSelection(null);
+        setPanel(null);
+        void updateState();
+      },
+    );
+  };
+  const row = entries.find((e) => e.id === selected);
+  const startEdit = (entry: Entry | null) => {
+    conceal();
+    setEditing(entry);
+    setDraft(
+      entry
+        ? {
+            name: entry.name,
+            login: entry.login,
+            url: entry.url,
+            password: null,
+          }
+        : { ...empty },
+    );
+    setReplacePassword(!entry);
+    setError("");
+  };
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    const original = editing;
+    void run(
+      () =>
+        original
+          ? call<Entry>("Update", status.generation, original.id, {
+              ...draft,
+              replacePassword,
+              revision: original.revision,
+            } satisfies Patch)
+          : call<Entry>("CreateEntry", status.generation, draft),
+      (result) => {
+        setEditing(undefined);
+        setDraft(empty);
+        setSelected(result.id);
+        setNotice("Entry saved.");
+        void refresh();
+      },
+    );
+  };
+  const copy = (field: string) => {
+    if (!row) return;
+    void run(
+      () => call("Copy", status.generation, row.id, field),
+      () =>
+        setNotice(
+          "Copied. Pass will clear its clipboard content after 30 seconds.",
+        ),
+    );
+  };
+  const reveal = () => {
+    if (!row) return;
+    if (revealed !== null) {
+      conceal();
+      return;
+    }
+    const nonce = ++revealSerial.current;
+    void run(
+      () => call<Entry>("Get", status.generation, row.id),
+      (entry) => {
+        if (nonce === revealSerial.current) setRevealed(entry.password ?? "");
+      },
+    );
+  };
+  const backup = () =>
+    void run(
+      async (check) => {
+        const picked = await call<Selection>("Choose", "backup");
+        check();
+        return call("Backup", status.generation, picked.token);
+      },
+      () => setNotice("Encrypted backup saved and verified."),
+    );
+  const rotate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (nextPassword !== confirmation) {
+      setError("The new passwords do not match.");
+      return;
+    }
+    void run(
+      () => call<string>("Rotate", status.generation, password, nextPassword),
+      (rollback) => {
+        fence.current.invalidate();
+        setBusy(false);
+        setPassword("");
+        setNextPassword("");
+        setConfirmation("");
+        setPanel(null);
+        void updateState().then(() =>
+          setNotice(
+            "Master password changed. Your encrypted old-password backup is preserved at " +
+              rollback,
+          ),
+        );
+      },
+    );
+  };
+  const importBackup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!source || !destination) return;
+    if (nextPassword !== confirmation) {
+      setError("The new passwords do not match.");
+      return;
+    }
+    void run(
+      () =>
+        call<number>(
+          "Import",
+          source.token,
+          destination.token,
+          password,
+          nextPassword,
+        ),
+      (count) => {
+        setPassword("");
+        setNextPassword("");
+        setConfirmation("");
+        setSource(null);
+        setDestination(null);
+        setNotice(
+          `Verified all ${count} entries. Open the new vault to continue.`,
+        );
+        setPanel(null);
+      },
+    );
+  };
+  const preserve = () => {
+    if (!password) {
+      setError("Enter the original master password first.");
+      return;
+    }
+    void run(
+      async (check) => {
+        const src = await call<Selection>("Choose", "source");
+        check();
+        const dst = await call<Selection>("Choose", "backup");
+        check();
+        return call("PreserveBackup", src.token, dst.token, password);
+      },
+      () => {
+        setPassword("");
+        setSource(null);
+        setNotice(
+          "Encrypted backup preserved and verified. Select that backup below to import.",
+        );
+      },
+    );
+  };
+  const passwordFields = (newVault = false) => (
+    <>
+      <label>
+        {newVault ? "Master password" : "Current master password"}
+        <input
+          type="password"
+          autoComplete="off"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      {newVault && (
+        <label>
+          Confirm master password
+          <input
+            type="password"
+            autoComplete="off"
+            required
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+          />
+        </label>
+      )}
+    </>
+  );
+  return (
+    <Feedback.Provider value={{ error, notice }}>
+      <div className="app">
+        <header>
+          <div className="brand">
+            <span className="brandmark" aria-hidden>
+              p
+            </span>
+            <div>
+              <h1>Pass</h1>
+              <span className="subtle">A quiet place for your passwords</span>
+            </div>
+          </div>
+          <div className="header-actions">
+            <span className={"status " + (status.locked ? "" : "unlocked")}>
+              {status.locked ? "Locked" : "Unlocked"}
+            </span>
+            {!status.locked && (
+              <button className="outline" onClick={lock}>
+                Lock vault <kbd>⌘ L</kbd>
+              </button>
+            )}
+          </div>
+        </header>
+        <div
+          className="messages"
+          aria-live="polite"
+          hidden={!!panel || editing !== undefined || !!deleting}
+        >
+          {error && (
+            <div role="alert" className="error">
+              {error}
+            </div>
+          )}
+          {notice && (
+            <div role="status" className="notice">
+              {notice}
+            </div>
+          )}
+        </div>
+        {status.locked ? (
+          <main className="welcome">
+            <div className="eyebrow">LOCAL. PRIVATE. YOURS.</div>
+            <h2>
+              Your secrets,
+              <br />
+              under your control.
+            </h2>
+            <p>
+              One encrypted vault. One master password.
+              <br />
+              Everything stays on your computer.
+            </p>
+            <div className="welcome-actions">
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => openPanel("unlock")}
+              >
+                Open vault <span aria-hidden>↗</span>
+              </button>
+              <button
+                className="outline"
+                disabled={busy}
+                onClick={() => openPanel("create")}
+              >
+                Create a vault
+              </button>
+            </div>
+            <button
+              className="text"
+              disabled={busy}
+              onClick={() => openPanel("import")}
+            >
+              Import or restore an encrypted backup →
+            </button>
+            <div className="local-note">
+              <span aria-hidden>◎</span> No account. No cloud. No subscriptions.
+            </div>
+          </main>
+        ) : (
+          <main className="workspace">
+            <aside>
+              <div className="vault-heading">
+                <div>
+                  <div className="eyebrow">YOUR VAULT</div>
+                  <h2 title={status.label}>{status.label}</h2>
+                </div>
+                <button
+                  className="icon"
+                  aria-label="Vault settings"
+                  onClick={() => openPanel("settings")}
+                >
+                  ⚙
+                </button>
+              </div>
+              <label className="search">
+                <span className="sr-only">Search entries</span>
+                <input
+                  placeholder="Search your vault"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    conceal();
+                  }}
+                />
+              </label>
+              <div className="list-heading">
+                <span>
+                  {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                </span>
+                <button
+                  className="text"
+                  disabled={busy}
+                  onClick={() => startEdit(null)}
+                >
+                  + New entry
+                </button>
+              </div>
+              <div className="entry-list" aria-label="Entries">
+                {entries.map((entry) => (
+                  <button
+                    className={
+                      "entry " + (entry.id === selected ? "active" : "")
+                    }
+                    key={entry.id}
+                    onClick={() => {
+                      setSelected(entry.id);
+                      conceal();
+                    }}
+                  >
+                    <span className="entry-avatar" aria-hidden>
+                      {(entry.name || "?").slice(0, 1).toUpperCase()}
+                    </span>
+                    <span>
+                      <strong>{entry.name || "Untitled entry"}</strong>
+                      <small>{entry.login || entry.url || "No username"}</small>
+                    </span>
+                    <span className="chevron" aria-hidden>
+                      ›
+                    </span>
+                  </button>
+                ))}
+                {entries.length === 0 && (
+                  <div className="empty-list">
+                    {search
+                      ? "No matching entries."
+                      : "Your vault is ready. Add your first entry."}
+                  </div>
+                )}
+              </div>
+              <div className="aside-footer">
+                <button className="text" disabled={busy} onClick={backup}>
+                  Save encrypted backup
+                </button>
+                <span className="subtle">
+                  Auto-lock: {status.idleMinutes} min
+                </span>
+              </div>
+            </aside>
+            <section className="detail" aria-label="Entry details">
+              {row ? (
+                <>
+                  <div className="detail-top">
+                    <span className="large-avatar" aria-hidden>
+                      {(row.name || "?").slice(0, 1).toUpperCase()}
+                    </span>
+                    <div>
+                      <span className="eyebrow">LOGIN</span>
+                      <h2>{row.name || "Untitled entry"}</h2>
+                    </div>
+                  </div>
+                  <div className="fields">
+                    <div>
+                      <span className="field-label">USERNAME</span>
+                      <div className="field-value">
+                        <span>{row.login ?? "Not set"}</span>
+                        <button
+                          className="text"
+                          disabled={busy || row.login === null}
+                          onClick={() => copy("login")}
+                        >
+                          Copy username
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="field-label">PASSWORD</span>
+                      <div className="field-value">
+                        <span
+                          className="secret"
+                          aria-label={
+                            revealed === null
+                              ? "Password hidden"
+                              : "Revealed password"
+                          }
+                        >
+                          {revealed === null ? "••••••••••••" : revealed}
+                        </span>
+                        <div>
+                          <button
+                            className="text"
+                            disabled={busy}
+                            onClick={reveal}
+                          >
+                            {revealed === null
+                              ? "Reveal password"
+                              : "Hide password"}
+                          </button>
+                          <button
+                            className="text"
+                            disabled={busy}
+                            onClick={() => copy("password")}
+                          >
+                            Copy password
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="field-label">WEBSITE</span>
+                      <div className="field-value">
+                        <span>{row.url ?? "Not set"}</span>
+                        <button
+                          className="text"
+                          disabled={busy || row.url === null}
+                          onClick={() => copy("url")}
+                        >
+                          Copy website
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="detail-actions">
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() => startEdit(row)}
+                    >
+                      Edit entry
+                    </button>
+                    <button
+                      className="text danger"
+                      disabled={busy}
+                      onClick={() => setDeleting(row)}
+                    >
+                      Delete entry
+                    </button>
+                  </div>
+                  <p className="subtle">
+                    Passwords stay hidden until you choose to reveal them.
+                  </p>
+                </>
+              ) : (
+                <div className="empty-detail">
+                  <div className="empty-symbol" aria-hidden>
+                    ◎
+                  </div>
+                  <h2>
+                    {entries.length
+                      ? "A little peace of mind."
+                      : "Make yourself at home."}
+                  </h2>
+                  <p>
+                    {entries.length
+                      ? "Select an entry to see its details."
+                      : "Start with a login you want to keep safe."}
+                  </p>
+                  <button className="outline" onClick={() => startEdit(null)}>
+                    + New entry
+                  </button>
+                </div>
+              )}
+            </section>
+          </main>
+        )}
+        <footer>
+          <span>Pass · Offline password manager</span>
+          <span>Your vault travels as one encrypted file.</span>
+        </footer>
+        {panel && (
+          <Modal
+            title={
+              {
+                unlock: "Open your vault",
+                create: "Create your vault",
+                import: "Import an encrypted backup",
+                rotate: "Change master password",
+                settings: "Vault settings",
+              }[panel]
+            }
+            close={() => openPanel(null)}
+            busy={busy}
+          >
+            {(panel === "unlock" || panel === "create") && (
+              <form onSubmit={authenticate}>
+                <p className="subtle">
+                  {panel === "create"
+                    ? "Choose a fresh vault file and a master password you can remember. There is no password reset."
+                    : "Select your vault and enter its master password."}
+                </p>
+                <button
+                  type="button"
+                  className="file-button"
+                  disabled={busy}
+                  onClick={() =>
+                    choose(panel === "create" ? "create" : "open", setSelection)
+                  }
+                >
+                  {selection?.label ??
+                    (panel === "create"
+                      ? "Choose vault location"
+                      : "Choose vault file")}{" "}
+                  <span aria-hidden>↗</span>
+                </button>
+                {passwordFields(panel === "create")}
+                <button
+                  className="primary full"
+                  disabled={busy || !selection || !password}
+                >
+                  {busy
+                    ? "Working…"
+                    : panel === "create"
+                      ? "Create vault"
+                      : "Unlock vault"}
+                </button>
+              </form>
+            )}
+            {panel === "settings" && (
+              <div className="settings">
+                <label>
+                  Lock after inactivity
+                  <select
+                    value={status.idleMinutes}
+                    onChange={(e) =>
+                      void run(
+                        () =>
+                          call(
+                            "SetIdle",
+                            status.generation,
+                            Number(e.target.value),
+                          ),
+                        () => void updateState(),
+                      )
+                    }
+                  >
+                    <option value={1}>1 minute</option>
+                    <option value={5}>5 minutes</option>
+                    <option value={15}>15 minutes</option>
+                  </select>
+                </label>
+                <button className="outline" onClick={() => openPanel("rotate")}>
+                  Change master password
+                </button>
+                <button className="outline" onClick={backup}>
+                  Save encrypted backup
+                </button>
+                <p className="subtle">
+                  Copied credentials may be visible to clipboard tools and other
+                  devices. Avoid copying if that is a concern.
+                </p>
+              </div>
+            )}
+            {panel === "rotate" && (
+              <form onSubmit={rotate}>
+                <p className="subtle">
+                  An encrypted backup protected by your old password will be
+                  kept. Store it carefully.
+                </p>
+                {passwordFields()}
+                <label>
+                  New master password
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={nextPassword}
+                    onChange={(e) => setNextPassword(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Confirm new master password
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={confirmation}
+                    onChange={(e) => setConfirmation(e.target.value)}
+                  />
+                </label>
+                <button
+                  className="primary full"
+                  disabled={busy || !nextPassword}
+                >
+                  {busy ? "Verifying…" : "Change password"}
+                </button>
+              </form>
+            )}
+            {panel === "import" && (
+              <form onSubmit={importBackup}>
+                <p className="subtle">
+                  Close the old app first. Keep its original encrypted backup
+                  untouched. Every entry will be verified in a fresh
+                  destination. Interrupted imports start over.
+                </p>
+                <label>
+                  Backup master password
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="text"
+                  disabled={busy}
+                  onClick={preserve}
+                >
+                  Need a backup? Preserve the original first ↗
+                </button>
+                <button
+                  type="button"
+                  className="file-button"
+                  disabled={busy}
+                  onClick={() => choose("source", setSource)}
+                >
+                  {source?.label ?? "Choose preserved encrypted backup"} ↗
+                </button>
+                <button
+                  type="button"
+                  className="file-button"
+                  disabled={busy}
+                  onClick={() => choose("destination", setDestination)}
+                >
+                  {destination?.label ?? "Choose fresh destination"} ↗
+                </button>
+                <label>
+                  New vault master password
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={nextPassword}
+                    onChange={(e) => setNextPassword(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Confirm new vault master password
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={confirmation}
+                    onChange={(e) => setConfirmation(e.target.value)}
+                  />
+                </label>
+                <button
+                  className="primary full"
+                  disabled={busy || !source || !destination || !nextPassword}
+                >
+                  {busy
+                    ? "Importing and verifying…"
+                    : "Import and verify every entry"}
+                </button>
+              </form>
+            )}
+          </Modal>
+        )}
+        {editing !== undefined && (
+          <Modal
+            title={editing ? "Edit entry" : "New entry"}
+            close={() => {
+              setEditing(undefined);
+              setDraft(empty);
+            }}
+            busy={busy}
+          >
+            <form onSubmit={save}>
+              {(["name", "login", "url"] as const).map((field) => (
+                <label key={field}>
+                  {
+                    { name: "Entry name", login: "Username", url: "Website" }[
+                      field
+                    ]
+                  }
+                  <input
+                    autoFocus={field === "name"}
+                    autoComplete="off"
+                    value={draft[field] ?? ""}
+                    onChange={(e) =>
+                      setDraft({ ...draft, [field]: e.target.value })
+                    }
+                  />
+                </label>
+              ))}
+              {editing && (
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={replacePassword}
+                    onChange={(e) => {
+                      setReplacePassword(e.target.checked);
+                      setDraft({ ...draft, password: null });
+                    }}
+                  />
+                  Replace password
+                </label>
+              )}
+              {(!editing || replacePassword) && (
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={draft.password ?? ""}
+                    onChange={(e) =>
+                      setDraft({ ...draft, password: e.target.value })
+                    }
+                  />
+                </label>
+              )}
+              {editing && !replacePassword && (
+                <p className="subtle">
+                  Your existing password will stay unchanged.
+                </p>
+              )}
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditing(undefined);
+                    setDraft(empty);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button className="primary" disabled={busy}>
+                  {busy ? "Saving…" : "Save entry"}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+        {deleting && (
+          <Modal
+            title="Delete this entry?"
+            close={() => setDeleting(null)}
+            busy={busy}
+          >
+            <p>
+              “{deleting.name || "Untitled entry"}” will be removed from this
+              vault. Older encrypted backups may still contain it.
+            </p>
+            <div className="form-actions">
+              <button
+                className="outline"
+                disabled={busy}
+                onClick={() => setDeleting(null)}
+              >
+                Keep entry
+              </button>
+              <button
+                className="primary destructive"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () =>
+                      call(
+                        "Delete",
+                        status.generation,
+                        deleting.id,
+                        deleting.revision,
+                      ),
+                    () => {
+                      setDeleting(null);
+                      setSelected(null);
+                      conceal();
+                      setNotice("Entry deleted.");
+                      void refresh();
+                    },
+                  )
+                }
+              >
+                Delete entry
+              </button>
+            </div>
+          </Modal>
+        )}
+      </div>
+    </Feedback.Provider>
+  );
 }
-function Modal({title,children,close,busy}:{title:string;children:React.ReactNode;close:()=>void;busy:boolean}){
- const feedback=useContext(Feedback);
- const ref=useRef<HTMLDivElement>(null);useEffect(()=>{const previous=document.activeElement as HTMLElement|null;const node=ref.current;const first=node?.querySelector<HTMLElement>('input,button,select');first?.focus();const trap=(e:KeyboardEvent)=>{if(e.key!=='Tab')return;const all=[...node!.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled])')];if(!all.length)return;const first=all[0],last=all[all.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}};node?.addEventListener('keydown',trap);return()=>{node?.removeEventListener('keydown',trap);previous?.focus()}},[]);
- return <div className="overlay"><div ref={ref} className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="modal-heading"><h2>{title}</h2><button className="icon" aria-label="Close dialog" disabled={busy} onClick={close}>×</button></div>{feedback.error&&<div role="alert" className="error">{feedback.error}</div>}{feedback.notice&&<div role="status" className="notice">{feedback.notice}</div>}{children}</div></div>
+function Modal({
+  title,
+  children,
+  close,
+  busy,
+}: {
+  title: string;
+  children: React.ReactNode;
+  close: () => void;
+  busy: boolean;
+}) {
+  const feedback = useContext(Feedback);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const node = ref.current;
+    const first = node?.querySelector<HTMLElement>("input,button,select");
+    first?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const all = [
+        ...node!.querySelectorAll<HTMLElement>(
+          "button:not([disabled]),input:not([disabled]),select:not([disabled])",
+        ),
+      ];
+      if (!all.length) return;
+      const first = all[0],
+        last = all[all.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    node?.addEventListener("keydown", trap);
+    return () => {
+      node?.removeEventListener("keydown", trap);
+      previous?.focus();
+    };
+  }, []);
+  return (
+    <div className="overlay">
+      <div
+        ref={ref}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="modal-heading">
+          <h2>{title}</h2>
+          <button
+            className="icon"
+            aria-label="Close dialog"
+            disabled={busy}
+            onClick={close}
+          >
+            ×
+          </button>
+        </div>
+        {feedback.error && (
+          <div role="alert" className="error">
+            {feedback.error}
+          </div>
+        )}
+        {feedback.notice && (
+          <div role="status" className="notice">
+            {feedback.notice}
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
 }
-createRoot(document.getElementById('root')!).render(<App/>);
+createRoot(document.getElementById("root")!).render(<App />);

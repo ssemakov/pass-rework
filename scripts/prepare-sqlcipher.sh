@@ -18,3 +18,10 @@ if [ ! -f internal/cipher/sqlite3.c ]; then
   cp ".deps/sqlcipher-$revision/sqlite3.c" ".deps/sqlcipher-$revision/sqlite3.h" internal/cipher/
   cp ".deps/sqlcipher-$revision/LICENSE.md" internal/cipher/SQLCIPHER-LICENSE.md
 fi
+
+python3 - <<'HASHES'
+import hashlib,pathlib
+for line in pathlib.Path('scripts/sqlcipher-generated.sha256').read_text().splitlines():
+ expected,name=line.split()
+ assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()==expected, 'SQLCipher generated source mismatch: '+name
+HASHES

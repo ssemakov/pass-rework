@@ -92,3 +92,22 @@ func TestCipherStatusAndTamper(t *testing.T) {
 		}
 	}
 }
+
+func TestInvalidRevisionDoesNotReportDeletion(t *testing.T) {
+	m := New(nil, nil)
+	defer m.Close()
+	p := filepath.Join(t.TempDir(), "vault.pass")
+	if e := m.Create(p, testKey); e != nil {
+		t.Fatal(e)
+	}
+	r, e := m.CreateEntry(m.Generation(), Input{Name: ptr("keep")})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = m.Delete(m.Generation(), r.ID, "0"); !errors.Is(e, ErrInput) {
+		t.Fatal("invalid revision not rejected", e)
+	}
+	if _, e = m.Get(m.Generation(), r.ID); e != nil {
+		t.Fatal("entry removed")
+	}
+}
