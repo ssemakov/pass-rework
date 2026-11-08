@@ -1,0 +1,49 @@
+{
+  "sourceCommit": "7cd8c6c0bc395fa3676c151a84c1657cda8cb481",
+  "driver": "@journeyapps/sqlcipher@4.0.0",
+  "knex": "0.20.4",
+  "node": "v12.22.12",
+  "publicPassword": "public-fixture-password",
+  "settings": {
+    "cipher_version": [
+      {
+        "cipher_version": "4.2.0 community"
+      }
+    ],
+    "cipher_page_size": [
+      {
+        "cipher_page_size": "4096"
+      }
+    ],
+    "kdf_iter": [
+      {
+        "kdf_iter": "256000"
+      }
+    ],
+    "cipher_use_hmac": [
+      {
+        "cipher_use_hmac": "1"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "id": 1,
+      "name": "O'Connor 🍋",
+      "login": null,
+      "password": "public-synthetic-secret\u0000tail",
+      "url": "",
+      "created_at": 1700000000123,
+      "updated_at": null
+    },
+    {
+      "id": 2,
+      "name": "O'Connor 🍋",
+      "login": "name@example.test",
+      "password": "second-public-synthetic-password",
+      "url": "https://example.test",
+      "created_at": -123,
+      "updated_at": 1700000000999
+    }
+  ]
+}
