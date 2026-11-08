@@ -232,3 +232,30 @@ test("late old native lock notifications cannot relock a newer authentication", 
     page.getByRole("button", { name: "+ New entry" }).first(),
   ).toBeEnabled();
 });
+
+test("a delayed pre-authentication status cannot overwrite a new unlocked session", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let arrived!: () => void;
+  const ready = new Promise<void>((resolve) => (arrived = resolve));
+  let held = false;
+  await page.route("**/test-api/State", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    if (!held && body.locked) {
+      held = true;
+      arrived();
+      await pending;
+    }
+    await route.fulfill({ response });
+  });
+  await ready;
+  await create(page);
+  release();
+  await expect(page.getByRole("button", { name: "Lock vault" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "+ New entry" }).first(),
+  ).toBeEnabled();
+});

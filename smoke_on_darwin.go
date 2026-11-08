@@ -45,6 +45,9 @@ func smokeHandler(next http.Handler, capability string, windowID func() string) 
 			return
 		}
 		ok := r.URL.Query().Get("ok") == "1"
+		if !ok {
+			fmt.Println("Synthetic native smoke failure:", r.URL.Query().Get("step"))
+		}
 		select {
 		case smokeFinish <- ok:
 		default:
@@ -62,6 +65,7 @@ func installSmoke(app *application.App, window *application.WebviewWindow, manag
 		case ok := <-smokeFinish:
 			if ok {
 				smokeResult.Store(0)
+				fmt.Println("Native WebKit smoke passed: explicit UI assertions complete")
 			}
 		case <-time.After(65 * time.Second):
 			fmt.Println("Native smoke timed out")
@@ -88,7 +92,7 @@ const smokeJS = `(async()=>{
  const button=(text)=>[...document.querySelectorAll('button')].find(b=>{const c=b.cloneNode(true);c.querySelectorAll('[aria-hidden]').forEach(n=>n.remove());return c.textContent.trim().startsWith(text)&&!b.disabled});
  const click=async text=>{(await wait(()=>button(text),text)).click();await delay(70)};
  const fill=async(label,value)=>{const input=await wait(()=>[...document.querySelectorAll('label')].find(e=>e.textContent.trim()===label)?.querySelector('input'),label);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));await delay(50)};
- const report=async ok=>{await fetch('/__smoke_result?ok='+Number(ok),{method:'POST',headers:{'X-Pass-Capability':window._wails.flags.vaultCapability}})};
+ const report=async (ok,step="")=>{await fetch('/__smoke_result?ok='+Number(ok)+'&step='+encodeURIComponent(step),{method:'POST',headers:{'X-Pass-Capability':window._wails.flags.vaultCapability}})};
  try{
   await click('Create a vault');await click('Choose vault location');await fill('Master password','public-native-smoke-master');await fill('Confirm master password','public-native-smoke-master');await click('Create vault');await wait(()=>button('Lock vault'),'unlock');
   await click('+ New entry');await fill('Entry name','Native synthetic login');await fill('Username','native@example.test');await fill('Password','public-native-smoke-secret');await click('Save entry');await wait(()=>button('Native synthetic login'),'entry saved');await click('Native synthetic login');await click('Reveal password');await wait(()=>document.querySelector('[aria-label="Revealed password"]')?.textContent==='public-native-smoke-secret','reveal');
@@ -97,5 +101,5 @@ const smokeJS = `(async()=>{
   await click('Lock vault');await wait(()=>document.body.textContent.includes('Your secrets,')&&!document.body.textContent.includes('public-native-smoke-secret'),'lock');
   window.location.href='data:text/html,<h1 id="untrusted-navigation">must never load</h1>';await delay(400);if(location.protocol!=='wails:'||document.querySelector('#untrusted-navigation'))throw new Error('navigation accepted');
   await report(true);
- }catch(error){console.error('Synthetic native smoke step failed',String(error));await report(false)}
+ }catch(error){console.error('Synthetic native smoke step failed',String(error));await report(false,String(error))}
 })()`

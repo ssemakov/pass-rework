@@ -81,6 +81,19 @@ func importChecked(backup, destination string, oldKey, newKey []byte, alive func
 	if e = schema(a, current); e != nil {
 		return 0, e
 	}
+	verify := func() error {
+		after, e := src.check()
+		if e != nil || !os.SameFile(before, after) {
+			return ErrFile
+		}
+		return nil
+	}
+	return writeSnapshot(a, current, dst, newKey, alive, verify)
+}
+
+// writeSnapshot is shared by import, live backup and password rotation. It
+// always writes a fresh encrypted candidate, reopens it, and compares every row.
+func writeSnapshot(a *cipher.DB, current bool, dst *location, newKey []byte, alive func() bool, verify func() error) (count int, err error) {
 	stage, e := newStaging(dst)
 	if e != nil {
 		return 0, e
@@ -180,9 +193,8 @@ func importChecked(backup, destination string, oldKey, newKey []byte, alive func
 	if e = b.Close(); e != nil {
 		return 0, e
 	}
-	after, e := src.check()
-	if e != nil || !os.SameFile(before, after) {
-		return 0, ErrFile
+	if e = verify(); e != nil {
+		return 0, e
 	}
 	if e = loc.noJournal(); e != nil {
 		return 0, e

@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"github.com/ssemakov/pass-rework/internal/cipher"
 	"path/filepath"
 	"testing"
 	"time"
@@ -81,4 +82,23 @@ func TestIdleLockInvalidatesBeforeWaitingForWorker(t *testing.T) {
 	}
 	m.mu.Unlock()
 	released = true
+}
+
+func TestNormalSessionExcludesExternalSQLiteConnections(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "exclusive.pass")
+	m := New(nil, nil)
+	defer m.Close()
+	if e := m.Create(p, testKey); e != nil {
+		t.Fatal(e)
+	}
+	if other, e := cipher.Open(p, testKey, 4, true); e == nil {
+		other.Close()
+		t.Fatal("another SQLite connection read an unlocked vault")
+	}
+	m.Lock()
+	other, e := cipher.Open(p, testKey, 4, true)
+	if e != nil {
+		t.Fatal("lock not released", e)
+	}
+	other.Close()
 }

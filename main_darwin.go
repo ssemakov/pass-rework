@@ -96,15 +96,17 @@ func run() error {
 				return strconv.FormatUint(uint64(window.ID()), 10)
 			})
 		}},
-		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
-		OnShutdown:  func() { desktop.ClearOwnedClipboard() },
-		ShouldQuit:  shutdown.ShouldQuit,
-		KeyBindings: map[string]func(application.Window){"CmdOrCtrl+L": func(application.Window) { go manager.Lock() }},
+		Mac:          application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
+		OnShutdown:   func() { desktop.ClearOwnedClipboard() },
+		PostShutdown: smokePostShutdown,
+		ShouldQuit:   shutdown.ShouldQuit,
+		KeyBindings:  map[string]func(application.Window){"CmdOrCtrl+L": func(application.Window) { go manager.Lock() }},
 	})
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Pass", Name: "vault", Width: 1040, Height: 760, MinWidth: 660, MinHeight: 520, URL: "/", DevToolsEnabled: false, DefaultContextMenuDisabled: true, Mac: application.MacWindow{TabbingMode: application.MacWindowTabbingModeDisallowed}})
 	for _, event := range []events.ApplicationEventType{events.Common.ScreenLocked, events.Common.SystemWillSleep, events.Mac.ApplicationWillSleep, events.Mac.ApplicationScreensDidSleep} {
 		app.Event.OnApplicationEvent(event, func(*application.ApplicationEvent) { go manager.Lock() })
 	}
+	window.OnWindowEvent(events.Mac.WebViewDidStartProvisionalNavigation, func(*application.WindowEvent) { go manager.Lock() })
 	window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) { go manager.Lock() })
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { desktop.DisableRestoration() })
 	installSmoke(app, window, manager)

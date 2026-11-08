@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestHistoricalJourneyappsFixture(t *testing.T) {
@@ -133,5 +134,68 @@ func TestPinnedEngineConfiguration(t *testing.T) {
 	r, e := d.Query("PRAGMA cipher_settings")
 	if e != nil || len(r) == 0 {
 		t.Fatal("missing cipher settings")
+	}
+}
+
+func TestCRUDCrashChild(t *testing.T) {
+	if os.Getenv("PASS_TEST_CRUD_CHILD") != "1" {
+		t.Skip("subprocess helper")
+	}
+	p := os.Getenv("PASS_TEST_LIVE")
+	d, e := cipher.Open(p, testKey, 4, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	d.Exec("PRAGMA cache_size=1")
+	if _, e = d.Exec("BEGIN IMMEDIATE"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = d.Exec("UPDATE login_items SET password='after-uncommitted-synthetic-password'"); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(p+".test-ready", []byte("synthetic transaction ready"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	time.Sleep(time.Hour)
+}
+func TestSQLiteRecoversKilledEditWithoutCustomRecovery(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "live.pass")
+	m := New(nil, nil)
+	if e := m.Create(p, testKey); e != nil {
+		t.Fatal(e)
+	}
+	r, e := m.CreateEntry(m.Generation(), Input{Name: ptr("existing"), Password: ptr("before-committed-synthetic-password")})
+	if e != nil {
+		t.Fatal(e)
+	}
+	m.Close()
+	child := exec.Command(os.Args[0], "-test.run=^TestCRUDCrashChild$")
+	child.Env = append(os.Environ(), "PASS_TEST_CRUD_CHILD=1", "PASS_TEST_LIVE="+p)
+	if e = child.Start(); e != nil {
+		t.Fatal(e)
+	}
+	defer child.Process.Kill()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, e = os.Stat(p + ".test-ready"); e == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, e = os.Stat(p + "-journal"); e != nil {
+		t.Fatal("no live journal", e)
+	}
+	if e = child.Process.Kill(); e != nil {
+		t.Fatal(e)
+	}
+	child.Wait()
+	recovered := New(nil, nil)
+	defer recovered.Close()
+	if e = recovered.Unlock(p, testKey); e != nil {
+		t.Fatal("engine recovery failed", e)
+	}
+	row, e := recovered.Get(recovered.Generation(), r.ID)
+	if e != nil || row.Password == nil || *row.Password != "before-committed-synthetic-password" {
+		t.Fatal("uncommitted edit survived", e)
 	}
 }

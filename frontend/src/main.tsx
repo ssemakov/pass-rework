@@ -34,7 +34,12 @@ function App() {
     [revealed, setRevealed] = useState<string | null>(null);
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusyValue] = useState(false);
+  const busyRef = useRef(false);
+  const setBusy = useCallback((value: boolean) => {
+    busyRef.current = value;
+    setBusyValue(value);
+  }, []);
   const [panel, setPanel] = useState<
     "unlock" | "create" | "import" | "rotate" | "settings" | null
   >(null);
@@ -113,7 +118,7 @@ function App() {
       setError("Unable to connect to the vault service."),
     );
     const t = setInterval(() => {
-      if (polling) return;
+      if (polling || busyRef.current) return;
       polling = true;
       const g = fence.current.capture();
       void call<Status>("State")
@@ -124,6 +129,7 @@ function App() {
             BigInt(s.generation) < BigInt(statusRef.current.generation || "0")
           )
             return;
+          if (busyRef.current && !s.locked) return;
           if (
             (s.locked && !statusRef.current.locked) ||
             s.generation !== statusRef.current.generation
@@ -198,9 +204,13 @@ function App() {
   }, [status.locked]);
   const lock = () => {
     scrub();
-    void call("Lock").catch(() =>
-      setError("Could not complete lock. Quit Pass to close the vault."),
-    );
+    setBusy(true);
+    void call("Lock")
+      .then(() => updateState())
+      .catch(() =>
+        setError("Could not complete lock. Quit Pass to close the vault."),
+      )
+      .finally(() => setBusy(false));
   };
   useEffect(() => {
     const keyboard = (e: KeyboardEvent) => {

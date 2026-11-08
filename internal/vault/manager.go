@@ -1,9 +1,11 @@
 package vault
 
 import (
+	"crypto/subtle"
 	"errors"
 	"github.com/ssemakov/pass-rework/internal/cipher"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -169,6 +171,21 @@ func (m *Manager) openLocked(path string, key []byte) error {
 			d.Close()
 		}
 	}()
+	// SQLite's exclusive connection lock also excludes other SQLite clients
+	// for the lifetime of a normal unlocked session; no custom recovery layer.
+	if _, e = d.Exec("PRAGMA locking_mode=EXCLUSIVE"); e != nil {
+		return e
+	}
+	if _, e = d.Exec("BEGIN EXCLUSIVE"); e != nil {
+		return e
+	}
+	if _, e = d.Query("SELECT count(*) FROM sqlite_schema"); e != nil {
+		d.Exec("ROLLBACK")
+		return e
+	}
+	if _, e = d.Exec("COMMIT"); e != nil {
+		return e
+	}
 	if e = schema(d, true); e != nil {
 		return e
 	}
@@ -361,16 +378,19 @@ func (m *Manager) Backup(token, destination string) error {
 	if e := m.check(token); e != nil {
 		return e
 	}
+	return m.snapshotLocked(token, destination, m.key)
+}
+func (m *Manager) snapshotLocked(token, destination string, key []byte) error {
 	dst, e := locate(destination)
 	if e != nil {
 		return e
 	}
 	defer dst.close()
-	lk, e := dst.lock()
+	owner, e := dst.lock()
 	if e != nil {
 		return e
 	}
-	defer unlock(lk)
+	defer unlock(owner)
 	if _, e = m.d.Exec("BEGIN"); e != nil {
 		return e
 	}
@@ -378,18 +398,11 @@ func (m *Manager) Backup(token, destination string) error {
 	if e = m.d.Integrity(); e != nil {
 		return e
 	}
-	if e = copyEncrypted(m.loc, dst); e != nil {
+	if e = schema(m.d, true); e != nil {
 		return e
 	}
-	d, e := cipher.Open(dst.path, m.key, 4, true)
-	if e != nil {
-		return e
-	}
-	defer d.Close()
-	if e = d.Integrity(); e != nil {
-		return e
-	}
-	return compare(m.d, d, true)
+	_, e = writeSnapshot(m.d, true, dst, key, func() bool { return token == m.generation() && !m.closed.Load() }, func() error { return m.check(token) })
+	return e
 }
 func (m *Manager) Import(backup, destination string, oldKey, newKey []byte) (int, error) {
 	return m.ImportAt(backup, destination, oldKey, newKey, m.generation())
@@ -417,36 +430,17 @@ func (m *Manager) Rotate(token string, oldKey, newKey []byte) (rollback string, 
 	if len(newKey) == 0 {
 		return "", ErrInput
 	}
-	check, e := cipher.Open(m.loc.path, oldKey, 4, true)
-	if e != nil {
+	if subtle.ConstantTimeCompare(oldKey, m.key) != 1 {
+		return "", cipher.ErrKey
+	}
+	var e error
+	candidate := filepath.Join(filepath.Dir(m.loc.path), "Pass-before-password-change-"+time.Now().UTC().Format("20060102-150405")+"-"+randomID()+".pass")
+	if e = m.snapshotLocked(token, candidate, oldKey); e != nil {
 		return "", e
-	}
-	check.Close()
-	candidate := sameParentCandidate(m.loc.path)
-	dst, e := locate(candidate)
-	if e != nil {
-		return "", e
-	}
-	defer dst.close()
-	// Keep the ownership lock while creating a consistent encrypted old-key backup.
-	if _, e = m.d.Exec("BEGIN"); e != nil {
-		return "", e
-	}
-	if _, e = m.d.Query("SELECT count(*) FROM login_items"); e != nil {
-		m.d.Exec("ROLLBACK")
-		return "", e
-	}
-	copyErr := copyEncrypted(m.loc, dst)
-	_, endErr := m.d.Exec("ROLLBACK")
-	if copyErr != nil {
-		return "", copyErr
-	}
-	if endErr != nil {
-		return "", endErr
 	}
 	rollback = candidate
 	target := sameParentCandidate(m.loc.path)
-	if _, e = Import(candidate, target, oldKey, newKey); e != nil {
+	if e = m.snapshotLocked(token, target, newKey); e != nil {
 		return rollback, e
 	}
 	defer os.Remove(target)
