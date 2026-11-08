@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: option-d-${{ github.ref }}
+  group: option-d-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   macos:

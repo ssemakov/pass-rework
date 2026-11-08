@@ -2,100 +2,62 @@
 
 Reviewer: separate adversary agent `/root/implementation_adversary`, 2026-11-08.
 
-Status: **interim review of work in progress** on `implementation/option-d`. This document will be updated after the remaining implementation and tests are available. It is an agent code review, not an external human audit or certification.
+**Final source-review disposition: no unresolved blocking code findings.** The twelve findings below were corrected and re-reviewed. This is an independent agent review with synthetic tests, not an external human audit or certification. A commissioned human audit is omitted from v1 as the owner requested.
 
-## Scope and requirements
+Reviewed the current implementation based on published snapshot `0db12fac`, including the subsequent explicit-empty-password replacement change and regression test. The final native rerun is separate from source-review completion: [run 42532280072](https://github.com/ssemakov/pass-rework/actions/runs/42532280072) is pending at this report update. The earlier complete native/browser matrix is recorded below; it must not be mistaken for validation of later code changes. See [VALIDATION.md](VALIDATION.md) for the final tested commit and results.
 
-Reviewed the native SQLCipher boundary and the initial vault file/schema/CRUD helpers, against the proposal and recorded discussion decisions. The desktop facade, migration orchestration, rotation, frontend and tests were not yet present at this first pass. Their absence is not reported as an implementation defect at this stage.
+## Scope and binding requirements
 
-The owner's requirements remain: preserve the encrypted original backup untouched; use a fresh encrypted migration destination; reopen it and verify every entry before success; discard interrupted candidates and restart from the backup, with no resumable checkpoint. Normal edits/deletes use SQLite transactions and its journal recovery. A commissioned external human audit is omitted from v1.
+Reviewed the CGo/SQLCipher boundary, schema and CRUD helpers, filesystem ownership/publication, manager lifecycle, import/backup/rotation, Wails facade and transport gate, macOS clipboard/navigation/shutdown integration, React state delivery, regression tests, historical fixture provenance, build/signing/notarization scripts, and README/security/migration/distribution/validation documentation. Relevant pinned Wails and SQLCipher source was inspected to establish native header injection, flag delivery, clipboard/main-thread behavior and pragma result types.
 
-## Findings
+The owner-approved migration contract is implemented: preserve the encrypted original backup untouched; write a fresh encrypted destination; reopen it and compare every field of every entry before reporting success; discard an owned incomplete attempt and restart from the backup after interruption. There are no checkpoints or resumable row state. Normal edits/deletes use SQLite transactions and built-in journal recovery, without a custom replay/recovery layer.
 
-### IR-01 — High / resolved: cipher-status type mismatch prevents every successful open
+## Findings and final dispositions
 
-`internal/cipher/cipher.go` tests `status[0][0].Int != 1` after `PRAGMA cipher_status`. The pinned SQLCipher amalgamation implements that pragma with `sqlcipher_vdbe_return_string(..., "1", ...)`, so the bridge returns `Value{Kind: Text, Text: "1"}` and `Int` remains zero. Correctly encrypted vaults therefore fail with `ErrCipher`.
+All descriptions in the issue column refer to earlier implementation snapshots, not unresolved defects in the reviewed source.
 
-Correction observed: the bridge now checks `Kind == Text` and `Text == "1"`. `TestEncryptedCRUD` and `TestCipherStatusAndTamper` exercise the real native create/open path and passed in this environment. Additional row/column shape hardening is a minor remaining defensive improvement for native pragma results.
+| ID / severity | Issue found | Correction and retained evidence |
+|---|---|---|
+| IR-01 / High | `cipher_status` returns TEXT but was checked as an integer, rejecting every open | Typed text check; exact effective profile readback on every connection; real encrypted create/open/wrong-key and configuration tests |
+| IR-02 / High | Hard-link publication could leave a two-link vault rejected after interruption | Descriptor-relative atomic no-replace rename (`renameat2` / `renameatx_np`), publication/no-overwrite tests and killed-import restart |
+| IR-03 / Medium | SQL `_` wildcard hid unexpected schema objects; version-table constraints/orphans were not validated | Exact object enumeration, canonical current-format definitions, type/UTF-8 checks and `foreign_key_check`; malicious-trigger/table/orphan fixtures rejected |
+| IR-04 / Medium | Interruption before completing the stage marker prevented restart | Safe cleanup of empty or exact-prefix partially marked private stages; unexpected files/owners/aliases still refused; setup-state regression tests |
+| IR-05 / Medium | Reopening a migration candidate replaced the connection captured by deferred cleanup | A closure closes the current verification handle on all exits; statements finalize before return and candidate cleanup follows handle closure |
+| IR-06 / High | Main-thread shutdown could wait on a manager operation waiting for native clipboard dispatch | Background shutdown draining through `ShouldQuit`; main-thread hook only clears native owned clipboard state; coordinator regression and real native quit path |
+| IR-07 / High | Runtime fallback/request routes were broader than the intended single-window facade | Native-overwritten exact window ID, per-run capability, strict POST/envelope/method allowlist, bounded ordinary dispatch, native navigation/popup denial and CSP; unauthorized/helper requests and real native navigation denial tested |
+| IR-08 / High | Late status/reveal responses could undo concealment or show A's password under B | Frontend session fences and reveal nonce, fresh generation on authentication, generation-tagged lock events, single-flight polling/busy ordering and lock acknowledgment; delayed-response browser regressions |
+| IR-09 / High | Queued opens could reopen after an admitted lock; `Close` was not terminal | Generation-bound native selection grants and `UnlockAt`/`CreateAt`/`ImportAt` admission, post-open `finishOpen`, terminal close and active-generation checks; deterministic stale-open/close tests |
+| IR-10 / High | Ordinary runtime slots could fill and reject Lock before invalidation | Fully authenticated/parsed allowlisted Lock bypasses ordinary capacity admission; independent reproduction and retest plus repository priority test |
+| IR-11 / Medium | Idle timeout waited on the worker mutex before invalidating | Atomic open-session indicator admits idle lock before worker draining; activity/session fields initialize before publishing it; blocked-worker idle regression |
+| IR-12 / High | Rotation could supersede a lock/close admitted during replacement and reopen under a new epoch | Rotation reuses `finishOpen(originalToken)` after reopening; deterministic clipboard-boundary Lock/Close tests reject the reopened session while retaining a usable new-key file |
 
-### IR-02 — High / resolved and tested: hard-link publication window
+Independent temporary overlay tests reproduced malformed-schema acceptance, queued post-lock unlock, Lock admission starvation and blocked-worker idle admission before their fixes. Corrected stale-generation/terminal-close and priority-Lock tests passed independently. A final rotation overlay blocked clipboard cleanup after replacement, admitted Lock, and confirmed `ErrLocked` plus new-key file usability. Equivalent critical regressions are retained in the repository; the reviewer did not edit implementation files.
 
-`internal/vault/files.go` publishes a staged candidate by creating a hard link at the final filename, then unlinking the candidate. A process interruption between those operations leaves both names pointing to the same inode (`Nlink == 2`). `regular()` rejects any vault with multiple links, while the next migration attempt immediately refuses the existing final destination. The verified vault is stranded until manual filesystem repair, contrary to the agreed interruption behavior.
+## Final storage and bridge assessment
 
-Correction observed: `rename.go` now uses Linux `renameat2(..., RENAME_NOREPLACE)` or macOS `renameatx_np(..., RENAME_EXCL)` relative to already opened source/destination directory descriptors. This removes the two-hard-link state and refuses an existing destination atomically. `TestStagingInterruptedSetupAndAtomicPublication` verifies single-link publication and the import suite rejects an existing destination. A separate killed-process test exercises discard/restart during row insertion. This is migration file publication, not a custom SQLite transaction-recovery layer.
+The new storage path compiles the pinned SQLCipher amalgamation into the application and uses `sqlite3_key` with explicit lengths. It checks engine identity, cipher status and exact expected profile settings before sensitive use. Values use copying native parameter binding; result bytes are copied before stepping/finalization. Supported NULL/empty/NUL/Unicode/signed-int64 values remain distinct. Unsupported types/invalid UTF-8 are rejected rather than silently normalized during migration. Controlled native key/bind/clipboard buffers are wiped and freed; this does not imply complete Go/JavaScript heap erasure.
 
-### IR-03 — Medium / resolved and tested: schema validation accepts unexpected write behavior
+Normal sessions hold SQLite EXCLUSIVE ownership as well as the application lock, excluding other SQLite clients. Edits/deletes use standard SQLite transactions. Live backup and rotation use `writeSnapshot` from the owned connection, not a raw copy of an exclusive-mode database with a retained journal. Each snapshot writes fresh encrypted storage, closes/reopens it, checks schema/cipher/integrity, compares entries/sequence/current metadata and publishes without overwrite. The optional legacy preservation operation separately makes a byte-identical encrypted copy of a clean closed source under a SQLite read transaction and verifies it. Its source is never rekeyed or repaired.
 
-`schema()` filters names with `name NOT LIKE 'sqlite_%'`. In SQL `LIKE`, `_` matches any single character. A user-defined trigger named `sqliteXwipe`, for example, is consequently omitted even though it does not have SQLite's reserved `sqlite_` prefix. Such a trigger can change the effect of later writes while the schema check accepts the file.
+Fresh files/stages use private permissions and reject unsafe aliases, ownership and changed identity. Publication uses native directory descriptors and atomic no-replace operations; rotation deliberately replaces only after verification and closure, retaining a verified encrypted old-password backup. Normal transaction recovery remains SQLite's responsibility. The 256 MiB file, 100,000-row and value/input limits and the trusted local-parent/same-user-process boundary are documented.
 
-Correction observed: enumeration now excludes only the exact expected `sqlite_sequence` object. Current-format tables must match their exact supported definitions and `foreign_key_check` must return no violations. `TestSchemaTamperingAndAliases` rejects the hidden-prefix trigger, malformed version table and orphan version fixture before normal operations. The expanded native suite passed independently.
+The sole registered facade exposes domain operations and generation-bound native dialog grants, rather than arbitrary paths or SQL. Grants may be reused for wrong-password retry within their exact generation; completed destinations still cannot be overwritten. Wails' native request wrapper overwrites the window ID before middleware. The authenticated strict gate rejects alternate query/chunk/helper transports before binding dispatch. The pinned native navigation category confines the privileged WebView to bundled main documents; future Wails updates must re-review that integration.
 
-### IR-04 — Medium / resolved and tested: staging setup interruption
+Framework logs are discarded because Wails debug messages can contain binding arguments/results. React renders vault fields as text. Backend lists omit passwords, frontend awaited results are fenced, clipboard checks/writes serialize with lock admission, and lock invalidates before native interruption/draining. Native clipboard change-count ownership prevents clearing later foreign content. The shutdown coordinator preserves the native main thread while draining. These are lifecycle controls, not an application recovery log.
 
-`newStaging()` creates its deterministic private directory before writing its ownership marker. Interruption after `Mkdir`, before the marker is completely written, leaves an empty or partially marked stage. A subsequent attempt requires the complete marker and refuses that leftover directory, so it cannot discard the incomplete output and restart automatically.
+## Verification and its limits
 
-Correction observed: an absent or exact-prefix partial marker is accepted only in an otherwise empty private stage; files other than the marker still require the complete marker. Foreign ownership, symlinks, broad directory permissions and unexpected files remain rejected. `TestStagingInterruptedSetupAndAtomicPublication` reconstructs these interrupted setup states and passes; `TestUnexpectedStageNeverDeleted` preserves unrelated contents.
+Independent local final-source checks completed successfully:
 
-### IR-05 — Medium / resolved in code: reopened migration verification handle cleanup
+- `go test -race ./internal/vault ./internal/service`: vault **23.693 s**, service **1.025 s**.
+- Frontend Vitest: **3 tests passed**.
+- Independent deterministic rotation/lock overlay: passed, including reopening the final file with the new key after denying the session reopen.
+- Static review of the seven-scenario browser suite, native assertions, negative encryption tests, real historical-driver fixture and distribution scripts. The implementer runs the full browser suite; the reviewer separately checked CI conclusions/log markers.
 
-`Import()` defers `b.Close()` on the initial destination connection, closes that connection, then assigns a newly opened verification connection to `b`. The original deferred method captures its original receiver. Failures in the reopened connection's schema, integrity or comparison checks consequently return without closing that new native handle. Its key and native resources remain live while the stage is discarded.
+Using read-only GitHub tools, the reviewer independently checked [run 42531608409](https://github.com/ssemakov/pass-rework/actions/runs/42531608409) at `96aca33f67f67cbab1f35ed085553a90b7afb819`: browser plus all four macOS 15/26 Intel/Apple Silicon jobs concluded success. Logs for native jobs `128886814209`, `128886814236`, `128886814259` and `128886814393` each contain **“Native WebKit smoke passed: explicit UI assertions complete”**. The jobs also passed native race tests, package/signature/linkage checks and packaged-binary vulnerability scans. A clean exit without that assertion marker is explicitly rejected by the smoke script.
 
-Correction observed: cleanup now uses a closure over the current `b`, so it closes the reopened verification connection on error. The bridge's `Close` is nil-safe. A failure-path integration test would strengthen this check.
+That matrix establishes real native behavior for its stated commit. The final per-handle profile enforcement, rotation race correction and latest UI/packaging changes require the final run linked above; pending evidence is not an unresolved source finding, and no later artifact is declared tested merely because its predecessor passed.
 
-### IR-06 — High / code corrected, lifecycle tests pending: shutdown/clipboard deadlock
+The historical fixture uses the original pinned Journeyapps/Knex path on Linux and reports SQLCipher 4.2.0/profile 4 despite the legacy compatibility-before-key call. Explicit profile-3 and profile-4 fixtures provide additional format coverage. This is stronger than a format assumption, but is not inspection of an original shipped macOS legacy binary.
 
-The pinned Wails `cleanup()` invokes shutdown hooks synchronously on the AppKit main thread. The configured hook calls `manager.Close()`, which waits on the manager's admission/state locks. Concurrent `Manager.Copy` holds those locks while `desktop.Clipboard.Write` calls `application.InvokeSync` and waits for the same main thread. Shutdown can therefore block the main thread waiting for a copy whose queued main-thread callback cannot run. Timer/lock clipboard clearing has the same lock-order risk.
-
-Correction observed: `ShouldQuit` now initiates manager draining on a background goroutine and returns to the native event loop; only after completion does it call `app.Quit`. The main-thread shutdown hook performs native last-owned clipboard cleanup directly and does not wait for the manager. Test this ordering deterministically, including pending clipboard write and clear callbacks during shutdown.
-
-### IR-07 — High / open verification gate: window context is not independent caller identity
-
-The desktop source identity is stronger than the first pass established: pinned Wails `webViewAssetRequest.Header()` clones the request headers and overwrites `x-wails-window-id` with the native window ID (and its name for this named window). This native overwrite was independently checked in `application.go`; frontend headers cannot impersonate another native window through the desktop scheme path. Downstream Wails nevertheless has a first-window fallback when identity is absent. `SecureAssets` currently allows missing Origin/Referer, and the desktop runtime handler does not enforce POST; it accepts query-encoded calls as well. Native prevention of navigation to other content is not yet configured.
-
-Required correction/gate: require the exact native-injected window identity before Wails' fallback, enforce the precise allowed runtime request shape and trusted content before dispatch, prohibit secondary/external content, and exercise these paths against the packaged macOS WebView. Custom-scheme Origin behavior needs runtime verification. A capability put in `app.Flags` alone would not distinguish external content: the pinned macOS navigation-finished hook unconditionally injects runtime flags into newly navigated pages. No exploit on macOS has been reproduced by this Linux-only static review; this is a concrete authorization/design gate, not a claim that ordinary remote pages already bypass the full platform.
-
-### IR-08 — High / partially corrected, delayed-response tests pending: late frontend responses
-
-Most `run()` and list results have a session fence, but `updateState()` applies its awaited status without one. A pre-lock unlocked response delivered after `scrub()` can restore the unlocked workspace. Polling likewise accepts a response merely because its generation differs, without establishing that it is newer/current.
-
-A pending reveal also has no entry/interaction identity. Entry-list buttons remain selectable while the reveal is pending: select A, request its password, select B, then deliver A's response. The response sets the shared `revealed` state and displays A's secret beneath B's title. Escape/search/panel changes can also clear a reveal and then have the pending result restore it.
-
-Correction observed: state requests now capture the session fence and reject older generations; concealment increments a reveal nonce which guards late secret delivery; picker workflows check their fence between awaits. The reveal and multi-picker paths are corrected in code.
-
-Remaining status ordering: a poll can read `locked:true` before an unlock finishes, then arrive after the explicit state refresh applied `locked:false` for the same generation. Both responses have the same fence and generation, so the stale poll scrubs the new session. Later unlocked polls with that same generation do not update the locked UI. Invalidate older status requests at authentication completion and/or use coordinated request serials, with deliberate admission for locked-to-unlocked transitions. Add delayed-response tests for this same-generation case as well as lock, entry changes and explicit concealment. The rotation callback also sets a nonsecret notice after an additional awaited state refresh; that does not restore a secret but can produce stale feedback.
-
-### IR-09 — High / corrected and independently retested: queued unlock after lock / nonterminal close
-
-`Manager.Unlock` and `Create` capture the epoch only after acquiring the state mutex. An unlock that has consumed its native selection token can queue while `Lock` holds that mutex during cleanup, acquire it after lock completes, capture the new epoch and open the vault despite the admitted lock. Explicit facade lock clears selected tokens only after manager locking completes, and native/idle locks do not clear them. Frontend result fencing conceals the late result but does not close this reopened backend session.
-
-`Manager.Close` also stops the watcher and calls `Lock` without making future opens fail. A queued unlock can reopen after shutdown draining, when no watcher remains.
-
-Correction observed: picker capabilities are generation-bound, the facade uses `UnlockAt`/`CreateAt` with an expected generation checked inside admission, and `Close` has a terminal atomic flag. An independent synthetic overlay test queued stale-generation `UnlockAt` behind blocked clipboard cleanup and verified rejection; a second test verified a closed manager cannot reopen. Both passed after correction. The production facade's generation-bound contract is the relevant boundary; repository tests should retain equivalent coverage.
-
-### IR-10 — High / corrected and independently retested: ordinary request admission can starve lock
-
-The hardened runtime handler limits all requests to eight occupied slots. Frontend polling starts another `State` every second even when prior calls are still waiting for the manager's state mutex. A long backup/storage operation can therefore accumulate blocked status calls and fill the slots. A subsequent explicit Lock request receives HTTP 429 before it reaches immediate epoch invalidation or native interruption.
-
-Correction observed: strictly authenticated, parsed and allowlisted Lock calls are exempt from ordinary slot admission; polling is single-flight. The independent overlay test first reproduced HTTP 429 behind eight blocked State calls and passed after the correction. Lock can still wait for safe native draining, but its invalidation is no longer rejected behind queued ordinary work.
-
-### IR-11 — Medium / open: idle lock waits for the storage worker before invalidating
-
-`watch()` acquires the manager state mutex to decide whether a vault is open before calling `Lock`. A storage/native operation which holds that mutex beyond the idle deadline prevents timeout lock admission, epoch invalidation, UI concealment and native interruption until the operation ends. This defeats the intended immediate concealment/drain separation for idle locking.
-
-Required correction: use an atomic session-open/admission indicator or equivalent nonblocking state to initiate timeout lock, then drain under the state mutex. An independent synthetic overlay test holds the worker mutex across an expired idle tick and observes that the epoch fails to advance; it currently fails as expected.
-
-## Positive observations from the initial pass
-
-- Keys use `sqlite3_key` with explicit byte lengths, not interpolated SQL; statements bind values with `SQLITE_TRANSIENT`, and text results are copied before stepping/finalization.
-- The native cipher version is checked and native failures are redacted. The compile flags omit loadable extensions and keep temporary storage in memory.
-- New files use exclusive creation and mode `0600`; lock files reject symlinks, foreign ownership and broad permissions. File helpers reject nonregular and hard-linked files.
-- Create/edit/delete operations use native SQLite transactions; optimistic revisions detect stale writes.
-- The migration comparison helper compares every selected field with its native null/text/integer representation and preserves the AUTOINCREMENT sequence, rather than checking only counts.
-- The sole registered service exposes domain operations and one-use native selection tokens rather than arbitrary paths or SQL. All service methods fail closed when caller authorization is absent.
-- Desktop framework logs are explicitly discarded because Wails debug output can contain binding arguments/results. The macOS clipboard uses a concealed-type marker and native change-count ownership rather than comparing the copied secret.
-
-## Validation performed
-
-Static review of `internal/cipher/cipher.go`, the initial vault helpers and manager/transfer orchestration, relevant SQLCipher pragma implementation, the D adversary proposal review and the discussion decisions. Ran `go test ./internal/vault` successfully with the provided Go toolchain and workspace caches; the two currently present tests use public synthetic data. No real vault was opened. No desktop or macOS runtime behavior has been established by this interim review.
-
-An independent temporary Go overlay test, `TestAdversarialMalformedVersionSchema`, replaced only a synthetic encrypted vault's `item_versions` with `CREATE TABLE item_versions(id INTEGER, revision INTEGER)`. The test expects rejection and failed because `schema(d, true)` accepted it, confirming the remaining IR-03 concern. The test source/overlay lived in `/tmp`; no implementation files were edited by this reviewer.
+No real vault was opened or migrated by this review. No commissioned audit, mathematical application proof, complete memory erasure, rollback freshness guarantee, future-beta guarantee, Developer ID/notarization result or full VoiceOver conformance is claimed. Those limits and owner-controlled release activities are accurately separated in the security/distribution/validation documents; they do not reinstate a paid-review requirement for v1.

@@ -43,12 +43,12 @@ The `e2e` Go build tag and Vite mode expose synthetic test controls only in that
 | Ownership/format | No-overwrite publication, interrupted staging setup, malicious schema/aliases, concurrent SQLite session exclusion |
 | Lifecycle | Immediate lock/idle invalidation, queued stale unlock, terminal Close, safe shutdown ordering |
 | Bridge | Unauthorized methods/callers/headers/envelopes denied; Lock capacity priority |
-| Frontend | Six end-to-end scenarios plus unit fence/readiness tests |
+| Frontend | Seven end-to-end scenarios plus unit fence/readiness tests |
 | Packaged app | Native WebKit assertions, CommonCrypto build, signature, native symbol linkage and binary vulnerability scan |
 
 ## Results
 
-Linux development verification on 2026-11-08: Go race tests pass for vault/service packages; frontend production build and unit tests pass; all six Chromium integration tests pass. npm dependency audit reports zero known vulnerabilities after upgrading Vite/Vitest; Go core-package vulnerability scan reports none. These advisory scans are time-dependent and do not certify dependencies or cover C code.
+Linux development verification on 2026-11-08: Go race tests pass for vault/service packages; frontend production build and unit tests pass; all seven Chromium integration tests pass. npm dependency audit reports zero known vulnerabilities after upgrading Vite/Vitest; Go core-package vulnerability scan reports none. These advisory scans are time-dependent and do not certify dependencies or cover C code.
 
 Native CI is defined in [option-d.yml](../.github/workflows/option-d.yml), using native GitHub runners for macOS 15 arm64/x86_64 and macOS 26 arm64/x86_64. Run [42531608409](https://github.com/ssemakov/pass-rework/actions/runs/42531608409) at commit `96aca33f67f67cbab1f35ed085553a90b7afb819` passed all five jobs: browser plus macOS 15/26 on arm64/x86_64. Each native log contains the explicit WebKit UI-completion marker in addition to successful race tests, packaging, signature/linkage checks and binary advisory scan. A final run will additionally validate the stricter per-handle cipher-profile readback, asserted provider settings and ZIP packaging.
 

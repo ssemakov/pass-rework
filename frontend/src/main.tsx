@@ -945,7 +945,10 @@ function App() {
                     checked={replacePassword}
                     onChange={(e) => {
                       setReplacePassword(e.target.checked);
-                      setDraft({ ...draft, password: null });
+                      setDraft({
+                        ...draft,
+                        password: e.target.checked ? "" : null,
+                      });
                     }}
                   />
                   Replace password

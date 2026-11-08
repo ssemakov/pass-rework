@@ -128,6 +128,48 @@ test("actual encrypted backend CRUD, unchanged password, backup, lock, rotation 
     "Verified all 1 entries",
   );
 });
+test("cancelled password changes preserve the secret and explicit blank replaces it", async ({
+  page,
+}) => {
+  await create(page);
+  await add(page, "Blank replacement", "original public secret");
+  await page.getByRole("button", { name: "Edit entry", exact: true }).click();
+  await page.getByLabel("Replace password").check();
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("cancelled public secret");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Reveal password", exact: true })
+    .click();
+  await expect(page.getByLabel("Revealed password")).toHaveText(
+    "original public secret",
+  );
+  await page.getByRole("button", { name: "Edit entry", exact: true }).click();
+  await page.getByLabel("Replace password").check();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
+  await page.getByRole("button", { name: "Save entry", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Reveal password", exact: true })
+    .click();
+  await expect(page.getByLabel("Revealed password")).toHaveText("");
+  await page
+    .getByRole("button", { name: "Copy password", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Copied");
+  await page.getByRole("button", { name: "Lock vault" }).click();
+  await page.getByRole("button", { name: "Open vault" }).click();
+  await page.getByRole("button", { name: "Choose vault file" }).click();
+  await page.getByLabel("Current master password").fill(master);
+  await page.getByRole("button", { name: "Unlock vault", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Blank replacement user@example.test" })
+    .click();
+  await page
+    .getByRole("button", { name: "Reveal password", exact: true })
+    .click();
+  await expect(page.getByLabel("Revealed password")).toHaveText("");
+});
 test("historical driver migration and safe text rendering", async ({
   page,
 }) => {
