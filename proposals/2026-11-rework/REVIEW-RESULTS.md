@@ -7,8 +7,8 @@ Separate adversary agents reviewed the original A/B/C options before presentatio
 | A | `adversary_native` — [native review](reviews/A-native.md) | Conditionally viable; good bespoke macOS candidate; storage/lifecycle proof outstanding |
 | B | `adversary_tauri` — [Tauri review](reviews/B-tauri.md) | Conditionally viable; justify cross-platform complexity and accept explicit frontend-compromise limits |
 | C | `adversary_keepassxc` — [KeePassXC review](reviews/C-keepassxc.md) | Conditionally viable; reduces ownership; safe lossless importer not yet established |
-| D | `adversary_go` — review in progress | Expanded Go/Wails design under review |
-| UI comparison | `adversary_ui` — review in progress | Cross-option analysis under review |
+| D | `adversary_go` — [Go/Wails review](reviews/D-go.md) | Conditionally viable; prove CGo ownership, actual bridge surface and lock ordering |
+| UI comparison | `adversary_ui` — [UI review](reviews/UI-comparison.md) | Suitable for comparing directions; clarify edit intent, imported provenance and full task parity |
 
 ## A dispositions
 
@@ -37,6 +37,23 @@ Separate adversary agents reviewed the original A/B/C options before presentatio
 - **C-M1, medium:** Preserved exact version/platform limitations of existing reviews. Converter and target macOS client hashes need their own tests/review.
 - **C-M2, medium:** Require both converter and client to pass oldest/current/prior OS tests, with prerelease results reported separately. Upstream minimum alone is insufficient.
 - **C-M3, medium:** Added clean-account file-plus-password restore and disabled optional browser/network integrations for the pilot. Inspect encrypted save staging/backup artifacts; no mandatory Keychain/key file dependency.
+
+## D dispositions
+
+- **D-H1, high:** Added explicit CGo buffer ownership/lifetimes, C-owned memory where required, copying binds with explicit lengths, copying read results before invalidation, overflow/error handling and NUL/int64/failure tests. No retained transient Go pointers or C-string truncation. The concrete bridge remains a blocking implementation spike.
+- **D-H2, high:** Added a narrow non-HTTP facade, redacted errors, actual callable-surface tests and native caller evidence. V1 has one privileged WebView and no secondary web content; the required caller boundary must be proved. Excluded MCP/control/dev/server/raw surfaces and require artifact/listener evidence. No Tauri-style permission model is assumed for Wails.
+- **D-H3, high:** Added frontend generation checks after awaits, serialized clipboard check/write versus lock, and valid C-handle lifetime through interruption/draining. Tests must establish the two delivery boundaries and distinguish visual concealment from completed lock.
+- **D-M1, medium:** Kept exact Wails/Go/runtime/SQLCipher/provider/build-tag and advisory validation as artifact evidence; no unmeasured performance or bundle-size benefit is claimed.
+- **D-M2, medium:** Preserved 15/26 as D’s comparison assumption, with native dependency, lifecycle, keyboard and accessibility tests on supported CPU/OS combinations.
+- **D-M3, medium:** Retained historic fixtures/every-entry comparison, untouched-backup restart and built-in SQLite transaction recovery. No checkpoints or custom edit/delete replay logic.
+
+## UI review dispositions
+
+- **UI-M1:** C’s exact legacy ID/timestamp/null metadata is immutable import provenance. Native fields are authoritative after edits; never replay old metadata over a newer value. No bidirectional export in v1.
+- **UI-M2:** Added explicit unchanged / blank / null edit intent. Never write a masked placeholder or an unrequested blank password; untouched fields remain unchanged. Test cancel and deliberate replacement.
+- **UI-M3:** Added password-change and encrypted backup/restore parity rows, plus cancellation/failure and clean-account reopen checks for custom apps and C.
+- **UI-L1:** Kept UI/native-feel/effort rankings qualitative; no UI, accessibility, size or speed measurements are claimed.
+- **UI-L2:** Added visible supersession notes to preserved A/B/C reports. Owner decisions and current E10 govern v1; a paid human audit is not required.
 
 ## Recommendation after review
 
