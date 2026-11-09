@@ -12,6 +12,7 @@ import (
 const smokeEnabled = false
 
 func smokePick(string) (string, error)                                          { return "", service.ErrDenied }
+func smokeSettingsPath() (string, error)                                        { return "", service.ErrDenied }
 func smokeHandler(h http.Handler, _ string, _ func() string) http.Handler       { return h }
 func installSmoke(*application.App, *application.WebviewWindow, *vault.Manager) {}
 func smokePostShutdown()                                                        {}

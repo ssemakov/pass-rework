@@ -7,8 +7,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"github.com/ssemakov/pass-rework/internal/settings"
 	"github.com/ssemakov/pass-rework/internal/vault"
 	"path/filepath"
+	"strconv"
 	"sync"
 )
 
@@ -18,20 +20,100 @@ type Selection struct {
 	Label string `json:"label"`
 }
 type selected struct{ path, purpose, generation string }
+type Preferences interface {
+	Load() (settings.Values, error)
+	Save(settings.Values) error
+	DefaultStorage() string
+}
+type State struct {
+	vault.Status
+	Storage       *Selection `json:"storage"`
+	NewStorage    *Selection `json:"newStorage"`
+	SettingsError string     `json:"settingsError"`
+}
 type Facade struct {
-	manager   *vault.Manager
-	picker    Picker
-	authorize func(context.Context) bool
-	mu        sync.Mutex
-	selected  map[string]selected
+	manager             *vault.Manager
+	picker              Picker
+	authorize           func(context.Context) bool
+	mu                  sync.Mutex
+	selected            map[string]selected
+	work                sync.Mutex
+	prefs               Preferences
+	values              settings.Values
+	settingsError       string
+	selectionGeneration string
+	storage, newStorage *Selection
 }
 
 func New(m *vault.Manager, p Picker, authorize func(context.Context) bool) *Facade {
-	return &Facade{manager: m, picker: p, authorize: authorize, selected: map[string]selected{}}
+	return NewWithSettings(m, p, authorize, nil)
+}
+func NewWithSettings(m *vault.Manager, p Picker, authorize func(context.Context) bool, prefs Preferences) *Facade {
+	f := &Facade{manager: m, picker: p, authorize: authorize, selected: map[string]selected{}, prefs: prefs, values: settings.Values{IdleMinutes: 5}}
+	if prefs != nil {
+		v, err := prefs.Load()
+		if err == nil {
+			f.values = v
+		} else {
+			f.settingsError = "Could not read settings. Open or create storage using the File menu."
+		}
+	}
+	return f
 }
 
 var ErrDenied = errors.New("request not authorized")
 var ErrCancelled = errors.New("selection cancelled")
+var ErrWorking = errors.New("another storage operation is in progress")
+
+// Called under f.mu. Stable per-generation grants survive arbitrary State polls.
+func (f *Facade) grant(path, purpose, generation string) (*Selection, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	token := hex.EncodeToString(b)
+	f.selected[token] = selected{path, purpose, generation}
+	return &Selection{token, filepath.Base(path)}, nil
+}
+
+func nextGeneration(g string) string {
+	n, _ := strconv.ParseUint(g, 10, 64)
+	return strconv.FormatUint(n+1, 10)
+}
+
+func (f *Facade) remember(path, generation string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if generation != f.manager.Generation() {
+		return false
+	}
+	f.values.StoragePath = path
+	f.selectionGeneration = ""
+	f.saveSettings()
+	return generation == f.manager.Generation()
+}
+func (f *Facade) saveSettings() {
+	if f.prefs == nil {
+		return
+	}
+	if f.prefs.Save(f.values) != nil {
+		f.settingsError = "Storage is ready, but settings could not be saved. Select it again after restarting."
+	} else {
+		f.settingsError = ""
+	}
+}
+func (f *Facade) authenticated(path, generation string) error {
+	f.mu.Lock()
+	idle := f.values.IdleMinutes
+	f.mu.Unlock()
+	if err := f.manager.SetIdle(generation, idle); err != nil {
+		return err
+	}
+	if !f.remember(path, generation) {
+		return vault.ErrLocked
+	}
+	return nil
+}
 
 func (f *Facade) allow(ctx context.Context) error {
 	if f.authorize == nil || !f.authorize(ctx) {
@@ -59,6 +141,10 @@ func (f *Facade) Choose(ctx context.Context, purpose string) (Selection, error) 
 	default:
 		return Selection{}, ErrDenied
 	}
+	if !f.work.TryLock() {
+		return Selection{}, ErrWorking
+	}
+	defer f.work.Unlock()
 	generation := f.manager.Generation()
 	path, e := f.picker(purpose)
 	if e != nil {
@@ -76,23 +162,65 @@ func (f *Facade) Choose(ctx context.Context, purpose string) (Selection, error) 
 	}
 	token := hex.EncodeToString(b)
 	f.mu.Lock()
-	if len(f.selected) > 32 {
+	if f.selectionGeneration != generation {
 		f.selected = map[string]selected{}
+		f.storage, f.newStorage = nil, nil
+		f.selectionGeneration = generation
+	}
+	// One selected file per purpose, plus stable remembered/default grants.
+	// Rechoosing a source must not invalidate its separately chosen destination.
+	for token, grant := range f.selected {
+		if grant.purpose == purpose && (f.storage == nil || token != f.storage.Token) && (f.newStorage == nil || token != f.newStorage.Token) {
+			delete(f.selected, token)
+		}
 	}
 	f.selected[token] = selected{path, purpose, generation}
 	f.mu.Unlock()
 	return Selection{token, filepath.Base(path)}, nil
 }
-func (f *Facade) State(ctx context.Context) (vault.Status, error) {
+func (f *Facade) State(ctx context.Context) (State, error) {
 	if e := f.allow(ctx); e != nil {
-		return vault.Status{}, e
+		return State{}, e
 	}
-	return f.manager.State(), nil
+	s := State{Status: f.manager.State()}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if s.Generation != f.manager.Generation() {
+		return State{}, vault.ErrLocked
+	}
+	s.SettingsError = f.settingsError
+	if !s.Locked {
+		return s, nil
+	}
+	if f.selectionGeneration != s.Generation {
+		f.selected = map[string]selected{}
+		f.storage, f.newStorage = nil, nil
+		f.selectionGeneration = s.Generation
+	}
+	var err error
+	if f.storage == nil && f.values.StoragePath != "" {
+		f.storage, err = f.grant(f.values.StoragePath, "open", s.Generation)
+		if err != nil {
+			return State{}, err
+		}
+	}
+	if f.newStorage == nil && f.prefs != nil {
+		f.newStorage, err = f.grant(f.prefs.DefaultStorage(), "create", s.Generation)
+		if err != nil {
+			return State{}, err
+		}
+	}
+	s.Storage, s.NewStorage = f.storage, f.newStorage
+	return s, nil
 }
 func (f *Facade) Unlock(ctx context.Context, selection, password string) error {
 	if e := f.allow(ctx); e != nil {
 		return e
 	}
+	if !f.work.TryLock() {
+		return ErrWorking
+	}
+	defer f.work.Unlock()
 	generation := f.manager.Generation()
 	path, e := f.take(selection, "open")
 	if e != nil {
@@ -100,12 +228,19 @@ func (f *Facade) Unlock(ctx context.Context, selection, password string) error {
 	}
 	key := []byte(password)
 	defer clear(key)
-	return f.manager.UnlockAt(path, key, generation)
+	if e = f.manager.UnlockAt(path, key, generation); e != nil {
+		return e
+	}
+	return f.authenticated(path, nextGeneration(generation))
 }
 func (f *Facade) Create(ctx context.Context, selection, password string) error {
 	if e := f.allow(ctx); e != nil {
 		return e
 	}
+	if !f.work.TryLock() {
+		return ErrWorking
+	}
+	defer f.work.Unlock()
 	generation := f.manager.Generation()
 	path, e := f.take(selection, "create")
 	if e != nil {
@@ -113,7 +248,10 @@ func (f *Facade) Create(ctx context.Context, selection, password string) error {
 	}
 	key := []byte(password)
 	defer clear(key)
-	return f.manager.CreateAt(path, key, generation)
+	if e = f.manager.CreateAt(path, key, generation); e != nil {
+		return e
+	}
+	return f.authenticated(path, nextGeneration(generation))
 }
 func (f *Facade) Lock(ctx context.Context) error {
 	if e := f.allow(ctx); e != nil {
@@ -122,6 +260,7 @@ func (f *Facade) Lock(ctx context.Context) error {
 	f.manager.Lock()
 	f.mu.Lock()
 	f.selected = map[string]selected{}
+	f.selectionGeneration = ""
 	f.mu.Unlock()
 	return nil
 }
@@ -171,12 +310,26 @@ func (f *Facade) SetIdle(ctx context.Context, g string, minutes int) error {
 	if e := f.allow(ctx); e != nil {
 		return e
 	}
-	return f.manager.SetIdle(g, minutes)
+	if e := f.manager.SetIdle(g, minutes); e != nil {
+		return e
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if g != f.manager.Generation() {
+		return vault.ErrLocked
+	}
+	f.values.IdleMinutes = minutes
+	f.saveSettings()
+	return nil
 }
 func (f *Facade) Backup(ctx context.Context, g, selection string) error {
 	if e := f.allow(ctx); e != nil {
 		return e
 	}
+	if !f.work.TryLock() {
+		return ErrWorking
+	}
+	defer f.work.Unlock()
 	path, e := f.take(selection, "backup")
 	if e != nil {
 		return e
@@ -187,6 +340,10 @@ func (f *Facade) PreserveBackup(ctx context.Context, source, destination, passwo
 	if e := f.allow(ctx); e != nil {
 		return e
 	}
+	if !f.work.TryLock() {
+		return ErrWorking
+	}
+	defer f.work.Unlock()
 	generation := f.manager.Generation()
 	src, e := f.take(source, "source")
 	if e != nil {
@@ -204,6 +361,10 @@ func (f *Facade) Import(ctx context.Context, source, destination, oldPassword, n
 	if e := f.allow(ctx); e != nil {
 		return 0, e
 	}
+	if !f.work.TryLock() {
+		return 0, ErrWorking
+	}
+	defer f.work.Unlock()
 	generation := f.manager.Generation()
 	src, e := f.take(source, "source")
 	if e != nil {
@@ -216,12 +377,23 @@ func (f *Facade) Import(ctx context.Context, source, destination, oldPassword, n
 	oldKey, newKey := []byte(oldPassword), []byte(newPassword)
 	defer clear(oldKey)
 	defer clear(newKey)
-	return f.manager.ImportAt(src, dst, oldKey, newKey, generation)
+	count, err := f.manager.ImportAt(src, dst, oldKey, newKey, generation)
+	if err != nil {
+		return 0, err
+	}
+	if !f.remember(dst, generation) {
+		return 0, vault.ErrLocked
+	}
+	return count, nil
 }
 func (f *Facade) Rotate(ctx context.Context, g, oldPassword, newPassword string) (string, error) {
 	if e := f.allow(ctx); e != nil {
 		return "", e
 	}
+	if !f.work.TryLock() {
+		return "", ErrWorking
+	}
+	defer f.work.Unlock()
 	oldKey, newKey := []byte(oldPassword), []byte(newPassword)
 	defer clear(oldKey)
 	defer clear(newKey)

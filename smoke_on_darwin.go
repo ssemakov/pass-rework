@@ -20,19 +20,39 @@ import (
 const smokeEnabled = true
 
 var smokeRoot string
+var smokeExternalRoot bool
+var smokePickCount atomic.Int32
 var smokeResult atomic.Int32
 var smokeOnce sync.Once
 var smokeFinish = make(chan bool, 1)
 
 func smokePick(purpose string) (string, error) {
+	smokePickCount.Add(1)
+	if err := prepareSmokeRoot(); err != nil {
+		return "", err
+	}
+	return filepath.Join(smokeRoot, "storage.pass"), nil
+}
+func prepareSmokeRoot() error {
 	if smokeRoot == "" {
+		if root := os.Getenv("PASS_NATIVE_SMOKE_ROOT"); root != "" {
+			smokeRoot = root
+			smokeExternalRoot = true
+			return nil
+		}
 		r, e := os.MkdirTemp("", "pass-native-synthetic-")
 		if e != nil {
-			return "", e
+			return e
 		}
 		smokeRoot = r
 	}
-	return filepath.Join(smokeRoot, "vault.pass"), nil
+	return nil
+}
+func smokeSettingsPath() (string, error) {
+	if err := prepareSmokeRoot(); err != nil {
+		return "", err
+	}
+	return filepath.Join(smokeRoot, "settings.json"), nil
 }
 func smokeHandler(next http.Handler, capability string, windowID func() string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +71,10 @@ func smokeHandler(next http.Handler, capability string, windowID func() string) 
 			return
 		}
 		ok := r.URL.Query().Get("ok") == "1"
+		if ok && smokePickCount.Load() != 0 {
+			ok = false
+			fmt.Println("Unexpected picker during startup/login")
+		}
 		if !ok {
 			fmt.Println("Synthetic native smoke failure:", r.URL.Query().Get("step"))
 		}
@@ -74,7 +98,11 @@ func installSmoke(app *application.App, window *application.WebviewWindow, manag
 					return
 				}
 				fmt.Println("Native window frame verified: 904x534")
-				window.ExecJS(smokeJS)
+				restarting := "false"
+				if os.Getenv("PASS_NATIVE_SMOKE_PHASE") == "restart" {
+					restarting = "true"
+				}
+				window.ExecJS("window.__smokeRestart=" + restarting + ";" + smokeJS)
 			}()
 		})
 	})
@@ -84,6 +112,9 @@ func installSmoke(app *application.App, window *application.WebviewWindow, manag
 			if ok {
 				smokeResult.Store(0)
 				fmt.Println("Native WebKit smoke passed: explicit UI assertions complete")
+				if os.Getenv("PASS_NATIVE_SMOKE_PHASE") == "restart" {
+					fmt.Println("Native remembered storage restart verified: wrong-key error, correct retry, zero pickers")
+				}
 			}
 		case <-time.After(65 * time.Second):
 			fmt.Println("Native smoke timed out")
@@ -93,7 +124,7 @@ func installSmoke(app *application.App, window *application.WebviewWindow, manag
 	}()
 }
 func smokePostShutdown() {
-	if smokeRoot != "" {
+	if smokeRoot != "" && !smokeExternalRoot {
 		os.RemoveAll(smokeRoot)
 	}
 	if smokeResult.Load() == 0 {
@@ -116,11 +147,23 @@ const smokeJS = `(async()=>{
   if(getComputedStyle(document.documentElement).backgroundColor!=='rgb(244, 244, 245)')throw new Error('legacy background');
   const login=await wait(()=>document.querySelector('.auth-container .outlined-field'),'login');
   if(Math.abs(login.getBoundingClientRect().height-56)>1||document.querySelector('header,footer'))throw new Error('legacy login layout');
-  command('create');await click('Select storage path');await fill('Master password','public-native-smoke-master');await click('Continue');await fill('Confirm Master Password','public-native-smoke-master');await click('Create Storage');await wait(()=>document.querySelector('[aria-label="Search stored secrets"]'),'unlock');
+  if(window.__smokeRestart){
+   await wait(()=>document.querySelector('input[placeholder="Enter your Master Password"]'),'remembered login');
+   if(document.querySelector('input[placeholder="Enter your storage Master Password"]'))throw new Error('restart returned to signup');
+   await fill('Master password','wrong-native-master');await click('Unlock storage');
+   await wait(()=>document.querySelector('[role="alert"]')?.textContent==="That didn't work",'wrong key indication');
+   await delay(1100);if(!document.querySelector('input[placeholder="Enter your Master Password"]')||document.querySelector('input').disabled)throw new Error('wrong key left login busy');
+   await fill('Master password','public-native-smoke-master');await click('Unlock storage');await wait(()=>document.querySelector('[aria-label="Search stored secrets"]'),'correct retry');
+   await fill('Search stored secrets','Native');await wait(()=>document.querySelector('article'),'persisted entry');await click('Reveal password');await wait(()=>document.querySelector('[aria-label="Revealed password"]')?.textContent==='public-native-smoke-secret','persisted password');
+  }else{
+  await wait(()=>document.querySelector('input[placeholder="Enter your storage Master Password"]'),'first launch signup');
+  if(!button('Import Storage…'))throw new Error('first launch import missing');
+  await fill('Master password','public-native-smoke-master');await click('Continue');await fill('Confirm Master Password','public-native-smoke-master');await click('Create Storage');await wait(()=>document.querySelector('[aria-label="Search stored secrets"]'),'unlock');
   const fab=document.querySelector('.fab').getBoundingClientRect();if(fab.width!==56||fab.height!==56)throw new Error('legacy add size');
   await click('Add new secret');await fill('Item name','Native synthetic login');await fill('Username','native@example.test');await fill('Password','public-native-smoke-secret');await fill('Website URL','https://example.test');await click('Save');await wait(()=>document.querySelector('[aria-label="Search stored secrets"]'),'saved');await fill('Search stored secrets','Native');await wait(()=>document.querySelector('article'),'card');await click('Reveal password');await wait(()=>document.querySelector('[aria-label="Revealed password"]')?.textContent==='public-native-smoke-secret','reveal');
   await click('Edit secret');await fill('Item name','Native edited login');await click('Save');await click('Reveal password');await wait(()=>document.querySelector('[aria-label="Revealed password"]')?.textContent==='public-native-smoke-secret','unchanged password');await click('Copy password');await wait(()=>button('Copy password'),'copy completed');
   if(document.querySelector('[role="alert"]'))throw new Error('copy failed');
+  }
   const denied=await fetch('/wails/runtime',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(denied.status!==403)throw new Error('unauthenticated bridge accepted');
   await fetch('/__smoke_key?key=l',{method:'POST',headers:{'X-Pass-Capability':window._wails.flags.vaultCapability}});await delay(200);if(!document.querySelector('[aria-label="Search stored secrets"]'))throw new Error('old Command-L still locks');
   await fetch('/__smoke_key?key=~',{method:'POST',headers:{'X-Pass-Capability':window._wails.flags.vaultCapability}});await wait(()=>document.querySelector('input[placeholder="Enter your Master Password"]')&&!document.body.textContent.includes('public-native-smoke-secret'),'native Command-tilde lock');

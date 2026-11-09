@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ssemakov/pass-rework/internal/service"
+	"github.com/ssemakov/pass-rework/internal/settings"
 	"github.com/ssemakov/pass-rework/internal/vault"
 	"net/http"
 	"os"
@@ -41,9 +42,13 @@ func (c *fakeClipboard) ClearIfOwned(t int64) {
 
 type testServer struct {
 	sync.RWMutex
-	facade  *service.Facade
-	manager *vault.Manager
-	root    string
+	facade       *service.Facade
+	manager      *vault.Manager
+	root         string
+	pickMu       sync.Mutex
+	picks        map[string]int
+	cancelPicker bool
+	openPath     string
 }
 
 func (s *testServer) reset() error {
@@ -63,14 +68,34 @@ func (s *testServer) reset() error {
 		return e
 	}
 	os.WriteFile(filepath.Join(root, "legacy.pass"), raw, 0600)
+	s.picks = map[string]int{}
+	s.cancelPicker = false
+	s.openPath = ""
+	s.start()
+	return nil
+}
+
+// Restart preserves the synthetic encrypted files and the real settings file.
+func (s *testServer) start() {
+	root := s.root
 	s.manager = vault.New(&fakeClipboard{}, nil)
 	backup := 0
 	destination := 0
 	lastBackup := ""
 	picker := func(purpose string) (string, error) {
+		s.pickMu.Lock()
+		defer s.pickMu.Unlock()
+		s.picks[purpose]++
+		if s.cancelPicker {
+			s.cancelPicker = false
+			return "", nil
+		}
 		switch purpose {
 		case "create", "open":
-			return filepath.Join(root, "vault.pass"), nil
+			if purpose == "open" && s.openPath != "" {
+				return s.openPath, nil
+			}
+			return filepath.Join(root, "storage.pass"), nil
 		case "backup":
 			backup++
 			lastBackup = filepath.Join(root, fmt.Sprintf("backup-%d.pass", backup))
@@ -86,8 +111,7 @@ func (s *testServer) reset() error {
 		}
 		return "", service.ErrDenied
 	}
-	s.facade = service.New(s.manager, picker, func(ctx context.Context) bool { return ctx.Value("test-authorized") == true })
-	return nil
+	s.facade = service.NewWithSettings(s.manager, picker, func(ctx context.Context) bool { return ctx.Value("test-authorized") == true }, settings.New(filepath.Join(root, "settings.json")))
 }
 func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -101,6 +125,41 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(204)
 		}
+		return
+	}
+	if r.Method == "POST" && r.URL.Path == "/test-restart" {
+		s.Lock()
+		s.manager.Close()
+		s.start()
+		s.Unlock()
+		w.WriteHeader(204)
+		return
+	}
+	if r.Method == "POST" && r.URL.Path == "/test-picker-cancel" {
+		s.pickMu.Lock()
+		s.cancelPicker = true
+		s.pickMu.Unlock()
+		w.WriteHeader(204)
+		return
+	}
+	if r.Method == "POST" && r.URL.Path == "/test-move-storage" {
+		v, err := settings.New(filepath.Join(s.root, "settings.json")).Load()
+		if err != nil || v.StoragePath == "" || os.Rename(v.StoragePath, v.StoragePath+".moved") != nil {
+			http.Error(w, "move failed", 500)
+			return
+		}
+		s.pickMu.Lock()
+		s.openPath = v.StoragePath + ".moved"
+		s.pickMu.Unlock()
+		w.WriteHeader(204)
+		return
+	}
+	if r.Method == "POST" && r.URL.Path == "/test-stats" {
+		s.pickMu.Lock()
+		defer s.pickMu.Unlock()
+		b, _ := os.ReadFile(filepath.Join(s.root, "settings.json"))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"picks": s.picks, "settings": string(b)})
 		return
 	}
 	if r.Method != "POST" {

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"github.com/ssemakov/pass-rework/internal/desktop"
 	"github.com/ssemakov/pass-rework/internal/service"
+	"github.com/ssemakov/pass-rework/internal/settings"
 	"github.com/ssemakov/pass-rework/internal/vault"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -67,7 +68,14 @@ func run() error {
 		return ok && window != nil && w.ID() == window.ID()
 	}
 	shutdown := service.NewShutdown(manager.Close, func() { app.Quit() })
-	facade := service.New(manager, picker, authorize)
+	settingsPath, err := settings.DefaultPath()
+	if smokeEnabled {
+		settingsPath, err = smokeSettingsPath()
+	}
+	if err != nil {
+		return err
+	}
+	facade := service.NewWithSettings(manager, picker, authorize, settings.New(settingsPath))
 	sub, err := fs.Sub(assets, "frontend/dist")
 	if err != nil {
 		return err

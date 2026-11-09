@@ -3,6 +3,9 @@ export interface Status {
   locked: boolean;
   label: string;
   idleMinutes: number;
+  storage?: Selection | null;
+  newStorage?: Selection | null;
+  settingsError?: string;
 }
 export interface Entry {
   id: string;

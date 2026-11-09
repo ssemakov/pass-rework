@@ -4,6 +4,8 @@ This document describes the implemented configuration and reproducible evidence.
 
 ## Cryptographic construction
 
+Non-secret preferences are separate from the encrypted vault: a private `settings.json` stores only the last successfully validated storage path and inactivity timeout. It never contains passwords, keys or entry values. Native code loads it with bounded no-follow parsing and writes atomic private replacements; JavaScript receives opaque selection grants. Wrong passwords do not open pickers, change the remembered path or trigger retries. See the [complete flow trace](FLOWS.md).
+
 The application uses upstream **SQLCipher 4.20.0 Community**, commit `355d4db92d3404e71faa8088d071a71d767807f4`, through its C API. There is no application-designed encryption wrapper. See the upstream [design](https://www.zetetic.net/sqlcipher/design/), [API](https://www.zetetic.net/sqlcipher/sqlcipher-api/) and [pinned source](https://github.com/sqlcipher/sqlcipher/tree/355d4db92d3404e71faa8088d071a71d767807f4).
 
 | New-vault property | Configuration |

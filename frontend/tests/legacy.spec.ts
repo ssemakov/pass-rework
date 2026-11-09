@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
-import { create, add } from "./helpers";
+import { create, add, lock, master } from "./helpers";
 async function geometry(page: Page, selectors: string[]) {
   return page.evaluate(
     (selectors) =>
@@ -29,6 +29,9 @@ test("legacy reference geometry, colors, copy and rendered pixels", async ({
   await request.post("/test-reset");
   await page.setViewportSize({ width: 904, height: 506 });
   await page.goto("/");
+  // A login screen requires a saved storage path, as in the legacy router.
+  await create(page);
+  await lock(page);
   const reference = await context.newPage();
   await reference.setViewportSize({ width: 904, height: 506 });
   const samples: unknown[] = [];
@@ -129,7 +132,13 @@ test("legacy reference geometry, colors, copy and rendered pixels", async ({
     [".auth-container .outlined-field", ".auth-container .icon-button"],
     [".MuiOutlinedInput-root", ".MuiIconButton-root"],
   );
-  await create(page);
+  await page
+    .getByPlaceholder("Enter your Master Password", { exact: true })
+    .fill(master);
+  await page
+    .getByPlaceholder("Enter your Master Password", { exact: true })
+    .press("Enter");
+  await expect(page.getByLabel("Search stored secrets")).toBeVisible();
   await add(page, "Example Mail", "public fixture password");
   await add(page, "Example Notes", "public second password");
   await page.getByLabel("Search stored secrets").fill("");

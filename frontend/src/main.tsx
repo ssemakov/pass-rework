@@ -62,6 +62,7 @@ function App() {
     revealSerial = useRef(0),
     statusRef = useRef(status);
   const closing = useRef<Promise<boolean> | null>(null);
+  const needsStorage = useRef(true);
   const transitionSerial = useRef(0),
     plannedLockGeneration = useRef<string | null>(null);
   statusRef.current = status;
@@ -70,6 +71,7 @@ function App() {
     setRevealed(null);
   }, []);
   const scrub = useCallback(() => {
+    needsStorage.current = true;
     fence.current.invalidate();
     setEntries([]);
     conceal();
@@ -87,10 +89,17 @@ function App() {
     setDeleting(null);
     setBusy(false);
     setError("");
+    setNotice("");
     setSearch("");
     statusRef.current = { ...statusRef.current, locked: true };
     setStatus(statusRef.current);
   }, [conceal]);
+  const restoreStorage = useCallback((state: Status) => {
+    needsStorage.current = false;
+    if (!state.locked) return;
+    setPanel(state.storage ? "unlock" : "create");
+    setSelection(state.storage ?? state.newStorage ?? null);
+  }, []);
   const updateState = useCallback(async () => {
     const g = fence.current.capture();
     const current = await call<Status>("State");
@@ -111,7 +120,8 @@ function App() {
     }
     statusRef.current = current;
     setStatus(current);
-  }, [scrub]);
+    restoreStorage(current);
+  }, [scrub, restoreStorage]);
   useEffect(() => {
     let active = true,
       polling = false;
@@ -152,11 +162,13 @@ function App() {
           if (busyRef.current && !s.locked) return;
           if (
             (s.locked && !statusRef.current.locked) ||
-            s.generation !== statusRef.current.generation
+            s.generation !== statusRef.current.generation ||
+            (s.locked && needsStorage.current)
           ) {
             scrub();
             statusRef.current = s;
             setStatus(s);
+            restoreStorage(s);
           }
         })
         .catch(() => {})
@@ -169,11 +181,12 @@ function App() {
       dispose();
       clearInterval(t);
     };
-  }, [scrub, updateState]);
+  }, [scrub, updateState, restoreStorage]);
   const run = async <T,>(
     task: (check: () => void) => Promise<T>,
     success?: (value: T) => void,
   ) => {
+    if (busyRef.current) return;
     const g = fence.current.capture();
     setBusy(true);
     setError("");
@@ -185,7 +198,12 @@ function App() {
       const result = await task(check);
       if (fence.current.accepts(g)) success?.(result);
     } catch (e) {
-      if (fence.current.accepts(g)) setError(message(e));
+      if (fence.current.accepts(g) && message(e) !== "selection cancelled")
+        setError(
+          message(e).includes("cannot unlock")
+            ? "That didn't work"
+            : message(e),
+        );
     } finally {
       if (fence.current.accepts(g)) setBusy(false);
     }
@@ -244,6 +262,7 @@ function App() {
           return false;
         statusRef.current = state;
         setStatus(state);
+        restoreStorage(state);
         if (state.generation !== expected) {
           // Another native lock superseded this transition even if its event
           // has not reached the WebView yet. Retain status, discard intent.
@@ -282,15 +301,25 @@ function App() {
         setNextPassword("");
         setConfirmation("");
         setDeleting(null);
+        if (statusRef.current.locked) openPanel(null);
       }
     };
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
   });
   const choose = async (purpose: string, set: (s: Selection) => void) => {
-    await run(() => call<Selection>("Choose", purpose), set);
+    let picked = false;
+    await run(
+      () => call<Selection>("Choose", purpose),
+      (s) => {
+        picked = true;
+        set(s);
+      },
+    );
+    return picked;
   };
   const openPanel = (p: typeof panel) => {
+    needsStorage.current = false;
     setPanel(p);
     setShowConfirmation(false);
     setSelection(null);
@@ -302,11 +331,22 @@ function App() {
     setError("");
     setNotice("");
     conceal();
+    if (statusRef.current.locked) {
+      if (p === null) restoreStorage(statusRef.current);
+      else if (p === "create")
+        setSelection(statusRef.current.newStorage ?? null);
+      else if (p === "unlock") setSelection(statusRef.current.storage ?? null);
+    }
   };
   const authenticate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (busyRef.current || !statusRef.current.generation) return;
     const creating = panel === "create";
     if (!password) return;
+    if (!selection) {
+      setError("Select storage path");
+      return;
+    }
     transitionSerial.current++;
     if (creating && !showConfirmation) {
       setShowConfirmation(true);
@@ -317,14 +357,9 @@ function App() {
       return;
     }
     void run(
-      async (check) => {
-        const picked =
-          selection ??
-          (await call<Selection>("Choose", creating ? "create" : "open"));
-        check();
-        setSelection(picked);
+      async () => {
         try {
-          await call(creating ? "Create" : "Unlock", picked.token, password);
+          await call(creating ? "Create" : "Unlock", selection.token, password);
         } catch (e) {
           if (!creating && message(e).includes("cannot unlock"))
             throw new Error("That didn't work");
@@ -442,6 +477,7 @@ function App() {
   };
   const importBackup = (e: React.FormEvent) => {
     e.preventDefault();
+    if (busyRef.current) return;
     if (!source || !destination) return;
     if (nextPassword !== confirmation) {
       setError("Passwords don't match");
@@ -462,8 +498,8 @@ function App() {
         setConfirmation("");
         setSource(null);
         setDestination(null);
-        setNotice(`Verified ${count} secrets`);
         setPanel(null);
+        void updateState().then(() => setNotice(`Verified ${count} secrets`));
       },
     );
   };
@@ -488,7 +524,8 @@ function App() {
     );
   };
   const begin = async (next: "unlock" | "create" | "import") => {
-    if (busyRef.current && !closing.current) return;
+    if (!statusRef.current.generation || (busyRef.current && !closing.current))
+      return;
     const transition = ++transitionSerial.current;
     const pending = closing.current;
     if (
@@ -499,7 +536,12 @@ function App() {
       return;
     if (transition !== transitionSerial.current) return;
     openPanel(next);
-    if (next === "unlock") await choose("open", setSelection);
+    if (
+      next === "unlock" &&
+      !(await choose("open", setSelection)) &&
+      transition === transitionSerial.current
+    )
+      restoreStorage(statusRef.current);
   };
   useEffect(() => {
     const command = (e: Event) => {
@@ -558,9 +600,9 @@ function App() {
   );
   const messages = (
     <div className="messages">
-      {error && (
+      {(error || status.settingsError) && (
         <div role="alert" className="error">
-          {error}
+          {error || status.settingsError}
         </div>
       )}
       {notice && (
@@ -577,7 +619,7 @@ function App() {
       tooltip="enter"
       className="icon-button primary-icon"
       type="submit"
-      disabled={busy}
+      disabled={busy || !selection}
       tabIndex={-1}
     />
   );
@@ -588,7 +630,7 @@ function App() {
         aria-label="Master password"
         type="password"
         autoComplete="off"
-        disabled={busy}
+        disabled={busy || !selection}
         placeholder={
           creating
             ? "Enter your storage Master Password"
@@ -691,9 +733,15 @@ function App() {
     );
   };
   return (
-    <Feedback.Provider value={{ error, notice }}>
+    <Feedback.Provider
+      value={{ error: error || status.settingsError || "", notice }}
+    >
       <div className="app" data-ready={status.generation !== ""}>
-        {status.locked && panel !== "import" ? (
+        {!status.generation ? (
+          <main className="auth-container">
+            <div className="auth-stack">{messages}</div>
+          </main>
+        ) : status.locked && panel !== "import" ? (
           <main className="auth-container">
             <form onSubmit={authenticate} className="auth-stack">
               <div className="auth-group">
@@ -710,6 +758,26 @@ function App() {
                 )}
                 {authPassword(panel === "create")}
                 <div className="auth-feedback">{messages}</div>
+                {panel === "create" && !status.storage && (
+                  <div className="startup-actions">
+                    <button
+                      type="button"
+                      className="button text-button"
+                      disabled={busy}
+                      onClick={() => void begin("import")}
+                    >
+                      Import Storage…
+                    </button>
+                    <button
+                      type="button"
+                      className="button text-button"
+                      disabled={busy}
+                      onClick={() => void begin("unlock")}
+                    >
+                      Open Storage…
+                    </button>
+                  </div>
+                )}
               </div>
             </form>
           </main>
