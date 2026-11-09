@@ -57,9 +57,9 @@ func run() error {
 		}
 		switch purpose {
 		case "open", "source":
-			return app.Dialog.OpenFile().SetTitle("Select encrypted vault or backup").AttachToWindow(window).PromptForSingleSelection()
+			return app.Dialog.OpenFile().SetTitle("Select storage path").AttachToWindow(window).PromptForSingleSelection()
 		default:
-			return app.Dialog.SaveFile().SetFilename("vault.pass").AttachToWindow(window).PromptForSingleSelection()
+			return app.Dialog.SaveFile().SetFilename("storage.pass").AttachToWindow(window).PromptForSingleSelection()
 		}
 	}
 	authorize := func(ctx context.Context) bool {

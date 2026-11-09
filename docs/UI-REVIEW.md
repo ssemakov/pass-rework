@@ -37,4 +37,12 @@ The initial `/__smoke_key` branch ran before the smoke handler's POST/capability
 
 The visual comparison uses source-derived inert references rendered with the historical React/Material UI versions, isolated from the production dependency tree. Its four-view geometry/color/pixel assertions are useful Chromium evidence. They are separate from real macOS WebKit key dispatch, native frame sizing and operating-system text rendering; the new native run must provide that evidence before those results are claimed.
 
+## Visual comparison normalization
+
+The first `7ede560e` browser CI failed only the results-view pixel comparison while ten functional tests passed. The reviewer independently downloaded artifact `13647833749` and compared the actual/reference PNGs: 4,902 pixels exceeded the existing 32-channel-delta threshold, and 4,901 of them were grayscale actual text versus colored LCD-subpixel reference text. Geometry and computed styles matched; login/home comparisons had zero changed pixels.
+
+Using `--disable-lcd-text` for the shared Chromium launcher normalizes this compositor-dependent rasterization for both pages. The geometry/style assertions and pixel tolerance are unchanged. This is a test-rendering normalization, not a relaxed match criterion or product-style substitution. The independent four-view comparison remains meaningful for the legacy layout and colors.
+
+The final parity pass also checked source defaults for card clipping, ButtonBase/disabled controls, typography, readiness focus and new-entry search reset. Long-value coverage must distinguish the card's legacy `overflow:hidden` property from the legacy parent Grid's behavior: the historical Grid can itself expand. The new document's viewport-width bound is a separate robustness assertion, not a claim that the old application's document always stayed bounded.
+
 No real vaults or passwords were used. No storage-encryption redesign, commissioned audit, notarization or future-beta claim is added by this UI review.

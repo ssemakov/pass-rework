@@ -116,6 +116,14 @@ test("legacy reference geometry, colors, copy and rendered pixels", async ({
   await expect(
     page.getByPlaceholder("Enter your Master Password", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByPlaceholder("Enter your Master Password", { exact: true }),
+  ).toBeFocused();
+  // Compare the unfocused state supplied in the reference screenshot; the
+  // production field still keeps the legacy keyboard autofocus behavior.
+  await page
+    .getByPlaceholder("Enter your Master Password", { exact: true })
+    .blur();
   await compare(
     "login",
     [".auth-container .outlined-field", ".auth-container .icon-button"],
@@ -171,6 +179,45 @@ test("legacy reference geometry, colors, copy and rendered pixels", async ({
       ".entry-form .button.contained",
     ],
     [".MuiOutlinedInput-root", ".MuiButton-outlined", ".MuiButton-contained"],
+  );
+  const long = "x".repeat(400);
+  await page.getByLabel("Item name", { exact: true }).fill(long);
+  await page.getByLabel("Username", { exact: true }).fill(long);
+  await page
+    .getByLabel("Website URL", { exact: true })
+    .fill("https://example.test/" + long);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByLabel("Search stored secrets").fill("xxx");
+  await expect(
+    page.getByRole("article", { name: long, exact: true }),
+  ).toBeVisible();
+  await reference.setContent(
+    await readFile(
+      new URL("./legacy-reference/results.html", import.meta.url),
+      "utf8",
+    ),
+  );
+  await reference.evaluate((long) => {
+    document.querySelector(".MuiCardContent-root .MuiBox-root")!.textContent =
+      long;
+    document.querySelector(
+      ".MuiCardContent-root .MuiGrid-grid-xs-10",
+    )!.textContent = long;
+  }, long);
+  expect(
+    await page
+      .locator(".item-card")
+      .evaluate((e) => getComputedStyle(e).overflow),
+  ).toBe(
+    await reference
+      .locator(".MuiCard-root")
+      .first()
+      .evaluate((e) => getComputedStyle(e).overflow),
+  );
+  // Preserve the original Card clipping rule and keep long records within
+  // the application's fixed viewport.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    904,
   );
   await writeFile(
     testInfo.outputPath("legacy-comparison.json"),

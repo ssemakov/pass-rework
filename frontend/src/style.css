@@ -34,12 +34,17 @@ select {
 }
 button {
   -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  user-select: none;
   cursor: pointer;
   border: 0;
 }
 button:disabled {
   cursor: default;
   color: rgba(0, 0, 0, 0.26);
+  pointer-events: none;
 }
 button,
 input {
@@ -208,6 +213,17 @@ p {
 }
 .outlined-field:focus-within label {
   color: #3f51b5;
+}
+.outlined-field:has(input:disabled) {
+  color: rgba(0, 0, 0, 0.38);
+  cursor: default;
+}
+.outlined-field:has(input:disabled) fieldset {
+  border-color: rgba(0, 0, 0, 0.26);
+  border-width: 1px;
+}
+.outlined-field:has(input:disabled) label {
+  color: rgba(0, 0, 0, 0.38);
 }
 .outlined-field.dense {
   margin-top: 8px;
@@ -380,6 +396,7 @@ p {
 }
 .item-card {
   position: relative;
+  overflow: hidden;
   background: #fff;
   border-radius: 4px;
   box-shadow:
@@ -496,6 +513,9 @@ p {
   color: rgba(0, 0, 0, 0.26);
   box-shadow: none;
 }
+.button.outlined:disabled {
+  border-color: rgba(0, 0, 0, 0.12);
+}
 .button.contained:disabled {
   background: rgba(0, 0, 0, 0.12);
 }
@@ -611,8 +631,5 @@ p {
     flex: 1;
     max-width: calc(100% - 60px);
     overflow-wrap: anywhere;
-  }
-  .secret-count {
-    font-size: 1.125rem;
   }
 }

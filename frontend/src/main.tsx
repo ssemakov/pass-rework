@@ -529,9 +529,22 @@ function App() {
     return () => window.removeEventListener("pass-command", command);
   });
   useEffect(() => {
-    if (panel === "create" || selection)
+    if (
+      status.locked &&
+      status.generation &&
+      !busy &&
+      !showConfirmation &&
+      panel !== "import"
+    )
       document.getElementById("master-password")?.focus();
-  }, [panel, selection]);
+  }, [
+    panel,
+    selection,
+    status.locked,
+    status.generation,
+    busy,
+    showConfirmation,
+  ]);
   const field = (key: keyof Input, label: string, type = "text") => (
     <Field
       dense
@@ -975,7 +988,7 @@ function App() {
                 onChange={(e) => setConfirmation(e.target.value)}
               />
               <p className="caption">
-                An encrypted backup will keep the old Master Password.
+                The encrypted backup uses the old Master Password.
               </p>
               <div className="form-actions">
                 <button
