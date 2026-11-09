@@ -23,14 +23,15 @@ const createVersions = "CREATE TABLE item_versions(id INTEGER PRIMARY KEY REFERE
 const createMeta = "CREATE TABLE pass_meta(format TEXT NOT NULL,uuid TEXT NOT NULL)"
 
 type Entry struct {
-	ID        string  `json:"id"`
-	Name      *string `json:"name"`
-	Login     *string `json:"login"`
-	Password  *string `json:"password,omitempty"`
-	URL       *string `json:"url"`
-	CreatedAt *string `json:"createdAt"`
-	UpdatedAt *string `json:"updatedAt"`
-	Revision  string  `json:"revision"`
+	ID          string  `json:"id"`
+	Name        *string `json:"name"`
+	Login       *string `json:"login"`
+	Password    *string `json:"password,omitempty"`
+	URL         *string `json:"url"`
+	CreatedAt   *string `json:"createdAt"`
+	UpdatedAt   *string `json:"updatedAt"`
+	Revision    string  `json:"revision"`
+	HasPassword bool    `json:"hasPassword"`
 }
 type Input struct {
 	Name     *string `json:"name"`
@@ -70,7 +71,7 @@ func asIntPtr(v cipher.Value) *string {
 	return &s
 }
 func fromRow(r []cipher.Value) Entry {
-	return Entry{strconv.FormatInt(r[0].Int, 10), r[1].StringPtr(), r[2].StringPtr(), r[3].StringPtr(), r[4].StringPtr(), asIntPtr(r[5]), asIntPtr(r[6]), strconv.FormatInt(r[7].Int, 10)}
+	return Entry{strconv.FormatInt(r[0].Int, 10), r[1].StringPtr(), r[2].StringPtr(), r[3].StringPtr(), r[4].StringPtr(), asIntPtr(r[5]), asIntPtr(r[6]), strconv.FormatInt(r[7].Int, 10), r[3].Kind == cipher.Text && len(r[3].Text) > 0}
 }
 func initialise(d *cipher.DB) error {
 	return d.Transaction(func() error {
@@ -178,13 +179,17 @@ func list(d *cipher.DB, q string) ([]Entry, error) {
 	if len(q) > 4096 {
 		return nil, ErrInput
 	}
-	rows, e := d.Query("SELECT i.id,i.name,i.login,NULL,i.url,i.created_at,i.updated_at,v.revision FROM login_items i JOIN item_versions v USING(id) WHERE instr(lower(coalesce(i.name,'')),lower(?))>0 OR instr(lower(coalesce(i.url,'')),lower(?))>0 OR instr(lower(coalesce(i.login,'')),lower(?))>0 ORDER BY coalesce(i.name,''),i.id", cipher.S(q), cipher.S(q), cipher.S(q))
+	// Presence alone reproduces the legacy empty-field UI without prefetching
+	// any password. BLOB length preserves embedded-NUL text semantics.
+	rows, e := d.Query("SELECT i.id,i.name,i.login,NULL,i.url,i.created_at,i.updated_at,v.revision,i.password IS NOT NULL AND length(CAST(i.password AS BLOB))>0 FROM login_items i JOIN item_versions v USING(id) WHERE instr(lower(coalesce(i.name,'')),lower(?))>0 OR instr(lower(coalesce(i.url,'')),lower(?))>0 OR instr(lower(coalesce(i.login,'')),lower(?))>0 ORDER BY coalesce(i.name,''),i.id", cipher.S(q), cipher.S(q), cipher.S(q))
 	if e != nil {
 		return nil, e
 	}
 	out := make([]Entry, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, fromRow(r))
+		entry := fromRow(r)
+		entry.HasPassword = r[8].Int != 0
+		out = append(out, entry)
 	}
 	return out, nil
 }

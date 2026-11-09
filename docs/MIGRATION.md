@@ -5,7 +5,7 @@ The supported route from `ssemakov/pass` is migration. The new app preserves the
 ## First migration
 
 1. Close the old application normally. A source with `-journal`, `-wal` or `-shm` files is refused. Let its original application/engine finish recovery first; do not delete those files to force import.
-2. Preserve the original encrypted file. The import dialog's **Preserve the original first** makes a fresh byte-identical encrypted backup, checks the copy hash, opens it with the source password and compares its entries. It never writes to or rekeys the source. An already preserved, clean encrypted backup can be selected directly.
+2. Preserve the original encrypted file. The import dialog's **Preserve original backup** makes a fresh byte-identical encrypted backup, checks the copy hash, opens it with the source password and compares its entries. It never writes to or rekeys the source. An already preserved, clean encrypted backup can be selected directly.
 3. Select that backup and a fresh destination filename. Enter the backup password and a new master password. The importer reads the backup without writing it and creates a private encrypted candidate. No plaintext intermediate or export file is used.
 4. Before success, the importer closes/reopens the candidate with its new key, runs SQLCipher authentication and SQLite integrity/schema checks, and compares every field, NULL/empty distinction, signed integer ID, timestamp and AUTOINCREMENT sequence. Current-format restores also preserve revisions and vault identity.
 5. Only the verified file is atomically published without replacing an existing destination. Keep the untouched original backup, then open the new file with its new password.
@@ -18,9 +18,9 @@ The repository's public synthetic fixture was produced by the actual legacy `@jo
 
 Pass exclusively owns one SQLCipher connection while unlocked. Edit/delete transactions use SQLite's `BEGIN IMMEDIATE`, FULL synchronization, fullfsync and standard rollback-journal recovery. A killed edit is recovered by SQLite on reopening; there is no custom recovery log or replay protocol.
 
-**Save encrypted backup** writes a fresh encrypted snapshot from the owned connection, reopens it and compares every entry before publication. Restore uses the same fresh-destination import flow. It never overwrites the live vault.
+**File → Save Encrypted Backup…** writes a fresh encrypted snapshot from the owned connection, reopens it and compares every entry before publication. Restore uses the same fresh-destination import flow. It never overwrites the live vault.
 
-**Change master password** verifies the current password, saves a verified encrypted old-password backup, creates/verifies a new-key candidate and atomically replaces the live filename after closing the old connection. The backup filename is reported on success and remains beside the vault. A failure or interruption can leave additional encrypted candidates/backups; the original or verified old-password backup remains the recovery source. This is file replacement for a password change, separate from ordinary transaction recovery.
+**File → Change Master Password…** verifies the current password, saves a verified encrypted old-password backup, creates/verifies a new-key candidate and atomically replaces the live filename after closing the old connection. The backup filename is reported on success and remains beside the vault. A failure or interruption can leave additional encrypted candidates/backups; the original or verified old-password backup remains the recovery source. This is file replacement for a password change, separate from ordinary transaction recovery.
 
 ## Portability and limits
 

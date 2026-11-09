@@ -111,3 +111,25 @@ func TestInvalidRevisionDoesNotReportDeletion(t *testing.T) {
 		t.Fatal("entry removed")
 	}
 }
+
+func TestMetadataPasswordPresenceWithoutSecretPrefetch(t *testing.T) {
+	m := New(nil, nil)
+	defer m.Close()
+	if e := m.Create(filepath.Join(t.TempDir(), "presence.pass"), testKey); e != nil {
+		t.Fatal(e)
+	}
+	for i, password := range []*string{nil, ptr(""), ptr("\x00public-presence-secret")} {
+		if _, e := m.CreateEntry(m.Generation(), Input{Name: ptr(string(rune('a' + i))), Password: password}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	rows, e := m.List(m.Generation(), "")
+	if e != nil || len(rows) != 3 {
+		t.Fatal(e)
+	}
+	for i, row := range rows {
+		if row.Password != nil || row.HasPassword != (i == 2) {
+			t.Fatal("metadata disclosed a password or lost null/empty/NUL presence", i)
+		}
+	}
+}

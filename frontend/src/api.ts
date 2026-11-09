@@ -13,6 +13,7 @@ export interface Entry {
   createdAt: string | null;
   updatedAt: string | null;
   revision: string;
+  hasPassword: boolean;
 }
 export interface Selection {
   token: string;

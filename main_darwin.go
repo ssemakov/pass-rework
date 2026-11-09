@@ -79,7 +79,7 @@ func run() error {
 		return strconv.FormatUint(uint64(window.ID()), 10)
 	})
 	app = application.New(application.Options{
-		Name: "Pass", Description: "Offline encrypted password vault",
+		Name: "Pass", Description: "Another password manager.",
 		Flags:    map[string]any{"vaultCapability": capability},
 		Services: []application.Service{application.NewService(facade)},
 		// Framework debug messages include binding args/results. Discard all logs,
@@ -100,15 +100,27 @@ func run() error {
 		OnShutdown:   func() { desktop.ClearOwnedClipboard() },
 		PostShutdown: smokePostShutdown,
 		ShouldQuit:   shutdown.ShouldQuit,
-		KeyBindings:  map[string]func(application.Window){"CmdOrCtrl+L": func(application.Window) { go manager.Lock() }},
+		// Wails names the physical tilde key as backquote on macOS, including
+		// when Shift produces '~'. The native menu displays the requested ⌘~.
+		KeyBindings: map[string]func(application.Window){
+			"CmdOrCtrl+`":       func(application.Window) { go manager.Lock() },
+			"CmdOrCtrl+Shift+`": func(application.Window) { go manager.Lock() },
+		},
 	})
-	window = app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Pass", Name: "vault", Width: 1040, Height: 760, MinWidth: 660, MinHeight: 520, URL: "/", DevToolsEnabled: false, DefaultContextMenuDisabled: true, Mac: application.MacWindow{TabbingMode: application.MacWindowTabbingModeDisallowed}})
+	window = app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Pass", Name: "vault", Width: 904, Height: 534, Hidden: true, URL: "/", DevToolsEnabled: false, DefaultContextMenuDisabled: true, Mac: application.MacWindow{TabbingMode: application.MacWindowTabbingModeDisallowed}})
+	installMenu(app, window, manager)
 	for _, event := range []events.ApplicationEventType{events.Common.ScreenLocked, events.Common.SystemWillSleep, events.Mac.ApplicationWillSleep, events.Mac.ApplicationScreensDidSleep} {
 		app.Event.OnApplicationEvent(event, func(*application.ApplicationEvent) { go manager.Lock() })
 	}
 	window.OnWindowEvent(events.Mac.WebViewDidStartProvisionalNavigation, func(*application.WindowEvent) { go manager.Lock() })
 	window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) { go manager.Lock() })
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { desktop.DisableRestoration() })
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		// Electron's legacy 904×534 dimensions describe the outer window.
+		// Wails constructs a content rect; SetSize explicitly sizes the frame.
+		window.SetSize(904, 534)
+		window.Show()
+		desktop.DisableRestoration()
+	})
 	installSmoke(app, window, manager)
 	return app.Run()
 }

@@ -11,6 +11,7 @@ print(result.stdout,end='');print(result.stderr,end='')
 Path('artifacts').mkdir(exist_ok=True)
 Path('artifacts/native-smoke.txt').write_text(result.stdout+result.stderr)
 assert result.returncode==0, 'native smoke returned failure'
+assert 'Native window frame verified: 904x534' in result.stdout, 'legacy window frame not verified'
 assert 'Native WebKit smoke passed: explicit UI assertions complete' in result.stdout, 'native smoke did not report completion'
 
 PY
