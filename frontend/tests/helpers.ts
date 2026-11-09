@@ -51,6 +51,7 @@ export async function add(page: Page, name: string, password: string) {
     .fill("https://example.test");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByLabel("Search stored secrets")).toBeVisible();
+  await expect(page.getByLabel("Search stored secrets")).toHaveValue("");
   await page.getByLabel("Search stored secrets").fill(name);
   await expect(page.getByRole("article", { name, exact: true })).toBeVisible();
 }

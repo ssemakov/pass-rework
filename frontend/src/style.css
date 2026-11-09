@@ -79,11 +79,6 @@ p {
     max-width: 1280px;
   }
 }
-@media (min-width: 1920px) {
-  .fixed-container {
-    max-width: 1920px;
-  }
-}
 .auth-stack {
   display: flex;
   flex-direction: column;
@@ -378,7 +373,7 @@ p {
   flex-direction: column;
   gap: 16px;
   margin-top: 16px;
-  padding-bottom: 24px;
+  padding-bottom: 16px;
 }
 .items-list:empty {
   padding-bottom: 0;

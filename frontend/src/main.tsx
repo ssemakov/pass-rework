@@ -356,6 +356,7 @@ function App() {
   );
   const startEdit = (entry: Entry | null) => {
     conceal();
+    if (entry === null) setSearch("");
     setEditing(entry);
     setDraft(
       entry

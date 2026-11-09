@@ -43,6 +43,12 @@ test("legacy reference geometry, colors, copy and rendered pixels", async ({
     await reference.mouse.move(0, 0);
     const a = await geometry(page, product),
       b = await geometry(reference, legacy);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollHeight),
+      `${name} scroll extent`,
+    ).toBe(
+      await reference.evaluate(() => document.documentElement.scrollHeight),
+    );
 
     for (let i = 0; i < a.length; i++) {
       for (const key of ["fontSize", "fontWeight", "color"] as const)

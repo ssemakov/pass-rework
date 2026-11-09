@@ -8,6 +8,9 @@ export default defineConfig({
     headless: true,
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      // Compare legacy/new text with the same grayscale rasterization. Linux
+      // LCD antialiasing otherwise changes with compositor-layer placement.
+      args: ["--disable-lcd-text"],
     },
   },
   webServer: {
