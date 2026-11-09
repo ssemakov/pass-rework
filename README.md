@@ -12,7 +12,9 @@ The UI mirrors legacy Pass: its gray background, indigo controls, centered passw
 
 Settings are saved at **`~/Library/Application Support/Pass Rework/settings.json`**, with the last successfully opened/created/imported `default_storage_path` and `idle_minutes`. This private, unencrypted settings file contains no passwords, keys or entries. The initial vault location is `storage.pass` in that directory; the folder button lets you choose another location. Passwords are never remembered. The legacy application's settings and original encrypted source are not modified.
 
-The deployment floor is **macOS 15**, with native CI for 15/26 on Apple Silicon and Intel. Future beta compatibility is exploratory. The [validation record](docs/VALIDATION.md) distinguishes tested builds from support promises.
+Run **`./scripts/verify-local.sh`** to validate locally without GitHub Actions. It runs race/vet/build/unit/browser checks and restores production assets. On macOS it additionally runs the two-process native restart/incorrect-password test, builds the app, checks its encryption linkage/signature and scans the packaged binary. Logs and a local results manifest are written under `artifacts/`. Only temporary synthetic vaults are used; the native smoke does not read your real app settings or vault.
+
+The deployment floor is **macOS 15**, targeting 15/26 on Apple Silicon and Intel. Earlier versions have recorded native platform evidence; current startup changes are locally validated on Linux and require the native local command for macOS execution evidence. The [validation record](docs/VALIDATION.md) separates those results. Verification does not depend on CI.
 
 Build on macOS with Xcode Command Line Tools, Go **1.27.3**, Node **24**, Python 3, Make and curl:
 

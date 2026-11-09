@@ -4,7 +4,7 @@ Reviewer: separate agent `/root/implementation_adversary`, 2026-11-09 (UTC).
 
 Scope: the startup/path regression reported after `a701182`, its settings and facade changes, login/picker ordering, cancellation, restart and interaction with existing storage/session operations. The earlier [13-finding implementation review](IMPLEMENTATION-REVIEW.md) and [UI review](UI-REVIEW.md) remain preserved as separate history.
 
-**Source review complete: no unresolved blocking code finding in the reviewed working tree.** Local flow tests passed independently. The new two-process native macOS restart smoke is reviewed source, with execution evidence pending; previous native passes do not validate this feature.
+**Source review complete: no unresolved blocking code finding.** Final reviewed application source is `2af2b2d369d585b24465f1f73f2590957ceea626`. Local flow tests passed independently, and the final complete local browser suite passed. Verification uses the local workflow and does not depend on GitHub Actions. The new two-process native macOS restart smoke is reviewed source but has not executed in this Linux workspace; previous native passes do not validate this feature.
 
 ## Findings and dispositions
 
@@ -25,6 +25,10 @@ The old frontend used `selection ?? await Choose(...)` inside authentication. Su
 Correction reviewed: authentication requires an existing opaque selection and calls only Create or Unlock. The picker is reached through explicit path/menu actions. Those storage commands also wait until initial State exists, preventing an early native menu action from racing bootstrap restoration. A rejected key keeps the login and selected vault, reports the error, and permits a correct retry without opening another dialog. The same error mapping applies to a rejected import key or current rotation password without scheduling another operation.
 
 Repeated submission is guarded synchronously in the frontend. The service uses a nonblocking work gate for pickers, authentication, backup, preservation, import and rotation, so duplicate expensive operations are rejected rather than queued. Lock bypasses that gate, retaining its generation invalidation and priority admission.
+
+### FLOW-03 — Low / resolved: a failed local verification rerun could retain stale success evidence
+
+The initial local verification script wrote its result manifest only after success but left an earlier successful manifest present when a subsequent run failed. Correction reviewed: startup removes the previous manifest; only a completed successful run writes a new `status:passed` record with UTC start/completion timestamps. An independent isolated copy of the actual script, with synthetic command stubs forcing the browser gate to fail, preserved exit code 27 through the log pipeline, removed stale success, wrote no new success, and restored production assets exactly once. This failure harness tests script behavior, not crypto or native execution.
 
 ## Security and lifecycle assessment
 
@@ -60,6 +64,16 @@ The reviewer then built the e2e assets and ran the seven-case version of `fronte
 
 An initial reviewer invocation accidentally used production frontend assets in the browser harness and therefore could not obtain the native Wails capability. That setup error was identified, the assets were rebuilt in e2e mode, and the complete seven-test rerun above passed. It is not presented as an application failure or native evidence.
 
-The reviewed native smoke launches two actual application processes against one synthetic settings directory. It requires first-launch creation, remembered login after process restart, wrong-key indication, correct retry, zero picker calls, persisted secret values, the 904×534 frame and physical Command-tilde behavior before reporting success. Exact-source macOS execution results must be recorded separately when available. No native success, commissioned audit, notarization or beta compatibility is inferred from local Chromium tests.
+## Final-source validation and native gap
+
+Source `2af2b2d369d585b24465f1f73f2590957ceea626` has recorded local passes for all **19 browser tests in 40.5 s**, including the bootstrap-command guard and mismatch/existing-destination regression added after the reviewer's seven-case run. All four source-derived legacy visual comparisons recorded zero pixels above the unchanged threshold. Its complete production-tagged Go race run passed (vault **28.640 s**, service **4.463 s**, settings **1.044 s**), along with Go vet, the production frontend build and all three unit tests. These are local results; the independently executed subset and source-review scope are stated above.
+
+The owner confirmed on 2026-11-09 that monthly free GitHub Actions minutes were exhausted and explicitly instructed, “Don't rely on CI for anything.” CI polling/retries stopped. Earlier independent inspection had found jobs failing before runner assignment with zero steps and unavailable logs; those attempts supply no application/native test evidence. The quota explanation is owner-confirmed, rather than inferred from the API response. No new CI outcome is required or claimed.
+
+The reviewer audited `scripts/verify-local.sh`: it runs the pinned SQLCipher preparation, uncached production-tagged race suite, vet, dependency installation, production build, unit tests and the complete browser suite locally. `set -euo pipefail` preserves failed gate status through log pipelines. An EXIT trap restores production assets if browser setup/testing fails. Native WebKit restart smoke, packaging, signature/encryption linkage checks and packaged-binary vulnerability scanning run only on Darwin, and the result manifest explicitly records whether native checks executed.
+
+The completed final Linux local-workflow logs and manifest were independently inspected (2026-11-09 **15:21:04–15:22:31 UTC**): **19 browser tests passed in 42.2 s**, all three unit tests passed, Go race packages passed (vault **28.968 s**, service **5.880 s**, settings **1.040 s**), and production assets were restored. Its manifest names application HEAD `2af2b2d`, explicitly records a dirty working tree for the subsequent verification-script/documentation edits, `status:passed`, UTC timestamps, `usesGitHubActions:false` and `nativeMacOSChecksExecuted:false`. This is local execution evidence, with no attribution of Linux browser results to macOS.
+
+The reviewed native smoke launches two actual application processes against one synthetic settings directory. It requires first-launch creation, remembered login after process restart, wrong-key indication, correct retry, zero picker calls, persisted secret values, the 904×534 frame and physical Command-tilde behavior before reporting success. The new native restart behavior remains unvalidated on macOS until an exact-source run executes. No native success, commissioned audit, notarization or beta compatibility is inferred from local Chromium tests.
 
 No real vaults or passwords were used.

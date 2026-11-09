@@ -1,0 +1,81 @@
+{
+  "applicationSourceCommit": "2af2b2d369d585b24465f1f73f2590957ceea626",
+  "localCommand": "./scripts/verify-local.sh",
+  "localRun": {
+    "status": "passed",
+    "startedAtUTC": "2026-11-09T15:21:04Z",
+    "completedAtUTC": "2026-11-09T15:22:31.299630+00:00",
+    "sourceCommit": "2af2b2d369d585b24465f1f73f2590957ceea626",
+    "workingTreeDirty": true,
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "architecture": "x86_64",
+    "raceTests": "passed",
+    "vet": "passed",
+    "productionBuild": "passed",
+    "unitTests": "passed",
+    "browserTests": "passed",
+    "nativeMacOSChecksExecuted": false,
+    "usesGitHubActions": false
+  },
+  "browserTests": {
+    "passed": 19,
+    "durationSeconds": 42.2
+  },
+  "unitTestsPassed": 3,
+  "goProductionRaceTests": {
+    "vaultSeconds": 28.968,
+    "serviceSeconds": 5.88,
+    "settingsSeconds": 1.04
+  },
+  "visualResults": [
+    {
+      "screen": "login",
+      "changedPixelFraction": 0
+    },
+    {
+      "screen": "home",
+      "changedPixelFraction": 0
+    },
+    {
+      "screen": "results",
+      "changedPixelFraction": 0
+    },
+    {
+      "screen": "add",
+      "changedPixelFraction": 0
+    }
+  ],
+  "settings": {
+    "macOSFile": "~/Library/Application Support/Pass Rework/settings.json",
+    "keys": [
+      "default_storage_path",
+      "idle_minutes"
+    ],
+    "directoryMode": "0700",
+    "fileMode": "0600",
+    "containsPasswordsOrKeys": false
+  },
+  "review": "docs/FLOW-REVIEW.md",
+  "flowInventory": "docs/FLOWS.md",
+  "retainedLog": "docs/evidence/local-validation-2026-11-09.txt",
+  "retainedLogSHA256": "1834f203dc5582ceb388bef5d2979e72692b5d37b9d94b32c3fb3556fa71b2aa",
+  "logNormalization": "ANSI control sequences stripped and sections concatenated; no other log content changed",
+  "workspaceLogSHA256": {
+    "artifacts/local-go-tests.txt": "c066f0fa2e6d326252b317d1abe8e603c05976e013467d620a41533c73ea04ed",
+    "artifacts/local-go-vet.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/local-frontend-build.txt": "9eb151701b8c7b617663f280d4e59591d60e5cc0a49dad62929f71e475dc9596",
+    "artifacts/local-frontend-unit.txt": "3a5b7a078df63c78788af90266d46f95411cd82ae9e34558a8b6691c52f3c0eb",
+    "artifacts/local-browser-tests.txt": "48c1bc9d9377e43a9fc8f11188c5adb8c45e9430c912848a55e6661a6bf79e21",
+    "artifacts/local-production-assets.txt": "36c105f50cdd55a2e1f45bfbdf601e4a845d5182aeb1a99852c7798895af5dab"
+  },
+  "localRunnerNegativeChecks": [
+    "Failed Go command preserves exit42 and removes old success manifest",
+    "Independent isolated browser failure preserves exit27 and restores production assets once"
+  ],
+  "nativeMacOSExecution": {
+    "executed": false,
+    "reason": "This execution host is Linux. Owner explicitly instructed not to rely on CI after monthly free Actions minutes were exhausted.",
+    "availableLocalTest": "Two actual native processes share synthetic settings/vault; firstcreate then remembered login, wrong-key error, correctretry, zero unintended pickers, persisted entry, frame and Cmd-tilde assertions."
+  },
+  "wholeSystemFreezeCause": "Not independently reproduced or established from the source trace."
+}

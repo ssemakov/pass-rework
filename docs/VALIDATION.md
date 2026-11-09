@@ -67,4 +67,6 @@ Developer ID signing, Apple notarization/stapling and testing on an available fu
 
 ## Subsequent legacy UI restoration
 
+For current startup/authentication behavior and validation, see [the complete flow trace](FLOWS.md) and [its independent review](FLOW-REVIEW.md). Use `./scripts/verify-local.sh` for local verification; the owner has instructed that validation must not rely on GitHub Actions. Historical CI results below are retained only for their named sources.
+
 The later UI work restores the legacy screens, 904 × 534 outer window and Command-tilde lock shortcut. Final UI source `460666df2939a507a9e8591755f86e96dc6c8ff5` passed its local production build, three unit tests, Go vet and all 11 browser integration tests, including four source-derived visual comparisons with zero pixels above the stated tolerance. The preceding UI source `5a420d3` passed the full native/browser matrix in run 42559048614; all four app artifacts were downloaded and verified. Final-source CI attempts fail before runner assignment with zero steps, so those predecessor native results are not attributed to the final source. See [UI restoration results](UI-RESTORATION.md), the separate [UI review](UI-REVIEW.md) and [UI evidence manifest](evidence/ui-2026-11-09.json). The original implementation results above remain historical evidence for their named source.
