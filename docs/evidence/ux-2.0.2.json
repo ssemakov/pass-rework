@@ -1,0 +1,84 @@
+{
+  "applicationVersion": "2.0.2",
+  "testedApplicationCommit": "fc9b4aee54395faa262427783a8afd9eb6de2cef",
+  "applicationTree": "79c060f2ccb649c2a45cfa399a64eedef50e276e",
+  "verification": "working tree committed unchanged after local verification; original HEAD/dirty flag preserved below",
+  "run": {
+    "status": "passed",
+    "startedAtUTC": "2026-11-10T02:45:03Z",
+    "completedAtUTC": "2026-11-10T02:47:10.506291+00:00",
+    "sourceCommit": "eceddcbba2ff14a839fc7025e1c3e2dd69a540b2",
+    "workingTreeDirty": true,
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "architecture": "x86_64",
+    "raceTests": "passed",
+    "vet": "passed",
+    "productionBuild": "passed",
+    "unitTests": "passed",
+    "browserTests": "passed",
+    "nativeMacOSChecksExecuted": false,
+    "usesGitHubActions": false
+  },
+  "browserTests": {
+    "passed": 28,
+    "reportedDuration": "1.1 min",
+    "newUXCases": 9
+  },
+  "unitTestsPassed": 3,
+  "productionRaceSeconds": {
+    "vault": 41.776,
+    "service": 8.306,
+    "settings": 1.052
+  },
+  "legacyVisualComparison": {
+    "metrics": [
+      {
+        "screen": "login",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "home",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "results",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "add",
+        "changedPixelFraction": 0
+      }
+    ],
+    "onlyIntentionalMask": ".home-lock",
+    "maskColor": "#f4f4f5",
+    "tolerancesChanged": false
+  },
+  "versionMetadata": {
+    "CFBundleName": "PassV2",
+    "CFBundleShortVersionString": "2.0.2",
+    "CFBundleVersion": "2.0.2",
+    "nativeAboutObserved": false,
+    "patchMinorHelperVerified": true,
+    "majorBumpRefused": true
+  },
+  "settings": {
+    "file": "~/Library/Application Support/PassV2/settings.json",
+    "migrateOldSettings": false,
+    "preserveExistingStorageAndOldSettings": true
+  },
+  "independentReview": "docs/UX-2.0.2-REVIEW.md",
+  "reviewBlockers": 0,
+  "retainedLog": "docs/evidence/local-ux-2.0.2.txt",
+  "retainedLogSHA256": "eab262f1dfa3e924e53724278dd099fd7ffc5a44a0acbde7977181cc60e78c28",
+  "logNormalization": "ANSI sequences removed; sections concatenated; no other log changes",
+  "workspaceLogSHA256": {
+    "local-go-tests.txt": "34d62d134014bd8f8958d86f7edf3678dc0697affd5a151017d2dd94a90b407f",
+    "local-go-vet.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local-frontend-build.txt": "41a96bd8c0b44e2a70824ab541164278293a76686ea1a57f08f5c68f9978e3c8",
+    "local-frontend-unit.txt": "670a59efc5b60ee3b3ade11093b4514c7726c5f99df036208075458a448f6ac2",
+    "local-browser-tests.txt": "634ec315b8b00c03d0bc24bad3b0e734930e3c74882b85cb960cb553424c6997",
+    "local-production-assets.txt": "13e20f54ad2a0dcedd296b7b18afe2ce04099c640045270ad85264c1a939d0fd"
+  },
+  "nativeMacOSSmokeExecuted": false,
+  "usesGitHubActions": false
+}

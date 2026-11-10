@@ -1,0 +1,160 @@
+PassV2 2.0.2 local synthetic verification
+Application source committed unchanged after verification: fc9b4aee54395faa262427783a8afd9eb6de2cef
+No CI/native macOS execution is claimed.
+
+Original run manifest:
+{
+  "status": "passed",
+  "startedAtUTC": "2026-11-10T02:45:03Z",
+  "completedAtUTC": "2026-11-10T02:47:10.506291+00:00",
+  "sourceCommit": "eceddcbba2ff14a839fc7025e1c3e2dd69a540b2",
+  "workingTreeDirty": true,
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "architecture": "x86_64",
+  "raceTests": "passed",
+  "vet": "passed",
+  "productionBuild": "passed",
+  "unitTests": "passed",
+  "browserTests": "passed",
+  "nativeMacOSChecksExecuted": false,
+  "usesGitHubActions": false
+}
+
+=== Go production race tests ===
+?   	github.com/ssemakov/pass-rework/internal/cipher	[no test files]
+ok  	github.com/ssemakov/pass-rework/internal/service	8.306s
+ok  	github.com/ssemakov/pass-rework/internal/settings	1.052s
+ok  	github.com/ssemakov/pass-rework/internal/vault	41.776s
+
+=== Go vet ===
+No diagnostics.
+
+=== Production frontend build ===
+
+> pass-ui@2.0.2 build
+> tsc -b && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 61 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.44 kB │ gzip:  0.28 kB
+dist/assets/index-0sPzJho4.css   10.36 kB │ gzip:  2.79 kB
+dist/assets/dist-Dj54zWVT.js     58.49 kB │ gzip: 17.65 kB
+dist/assets/index-B4cOCZnU.js   220.78 kB │ gzip: 69.00 kB
+✓ built in 1.14s
+
+=== Frontend unit tests ===
+
+> pass-ui@2.0.2 test
+> vitest run
+
+
+ RUN  v4.1.12 /workspace/pass-rework/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  02:45:54
+   Duration  367ms (transform 78ms, setup 0ms, import 96ms, tests 71ms, environment 0ms)
+
+
+=== Browser integration tests ===
+vite v7.3.7 building client environment for e2e...
+transforming...
+✓ 61 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.44 kB │ gzip:  0.28 kB
+dist/assets/index-0sPzJho4.css   10.36 kB │ gzip:  2.79 kB
+dist/assets/index-DD43R4rC.js   218.73 kB │ gzip: 68.17 kB
+✓ built in 1.37s
+
+> pass-ui@2.0.2 e2e
+> playwright test
+
+
+Running 28 tests using 1 worker
+
+(node:50674) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:50674) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/flows.spec.ts:40:1 › service startup failure is visible and recovers without showing an unconfigured login (2.1s)
+  ✓   2 tests/flows.spec.ts:63:1 › New Storage mismatch does not create; an existing default is never overwritten and Escape restores login (2.2s)
+  ✓   3 tests/flows.spec.ts:96:1 › first launch creates storage without a picker; real restart restores path and idle preference (2.4s)
+[WebServer] 2026-11-10 02:46:09.157: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:09.157: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:09.157: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-10 02:46:09.190: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:09.190: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:09.190: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓   4 tests/flows.spec.ts:138:1 › rejected password performs one attempt, opens no dialog and permits a correct retry (4.5s)
+  ✓   5 tests/flows.spec.ts:191:1 › cancelled Open, backup and import preserve the saved storage and clear old credentials (2.7s)
+  ✓   6 tests/flows.spec.ts:238:1 › missing remembered file stays on login until explicit Open selects its moved path (3.0s)
+[WebServer] 2026-11-10 02:46:18.435: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:18.435: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:18.435: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-10 02:46:18.481: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:18.481: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:18.481: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓   7 tests/flows.spec.ts:261:1 › first-run import rejects a bad key without changing settings; verified destination survives restart (3.6s)
+  ✓   8 tests/flows.spec.ts:323:1 › wrong current password during rotation leaves the unlocked vault and preferences intact (1.6s)
+login: legacy geometry/styles match; changed pixels 0
+home: legacy geometry/styles match; changed pixels 0
+results: legacy geometry/styles match; changed pixels 0
+add: legacy geometry/styles match; changed pixels 0
+  ✓   9 tests/legacy.spec.ts:20:1 › legacy reference geometry, colors, copy and rendered pixels (4.0s)
+  ✓  10 tests/ux-2.0.2.spec.ts:39:1 › import is centered, shows complete paths and has automatic source preservation (325ms)
+  ✓  11 tests/ux-2.0.2.spec.ts:75:1 › creation and import validate both fields immediately and recover when either field matches (398ms)
+[WebServer] 2026-11-10 02:46:28.243: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:28.243: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:28.243: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-10 02:46:28.274: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:28.274: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:28.274: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓  12 tests/ux-2.0.2.spec.ts:109:1 › V1 consent stays focused, carries no password and migrates only after agreement (3.1s)
+  ✓  13 tests/ux-2.0.2.spec.ts:198:1 › missing file reports friendly text, full path and explicit Open/Import recovery (1.3s)
+  ✓  14 tests/ux-2.0.2.spec.ts:219:1 › unopenable permissions offer Open and Import instead of chmod instructions (1.6s)
+  ✓  15 tests/ux-2.0.2.spec.ts:242:1 › empty import reports Imported0 on the same screen and opens without a second picker (4.0s)
+  ✓  16 tests/ux-2.0.2.spec.ts:274:1 › delete close tooltip fits inside the dialog; header lock is right aligned and scrubs secrets (1.9s)
+  ✓  17 tests/ux-2.0.2.spec.ts:321:1 › Lock rejects a delayed successful import result (1.0s)
+  ✓  18 tests/ux-2.0.2.spec.ts:350:1 › Lock rejects a delayed V1 consent offer (566ms)
+[WebServer] 2026-11-10 02:46:45.492: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:45.492: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:45.492: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-10 02:46:46.581: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:46.581: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:46.581: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-10 02:46:46.609: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-10 02:46:46.610: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-10 02:46:46.610: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓  19 tests/vault.spec.ts:10:1 › encrypted backend CRUD, unchanged password, backup, rotation and restore (7.3s)
+  ✓  20 tests/vault.spec.ts:125:1 › cancel preserves the password and explicit blank replacement persists (2.6s)
+  ✓  21 tests/vault.spec.ts:191:1 › historical migration and text-only rendering (2.5s)
+  ✓  22 tests/vault.spec.ts:221:1 › late reveal cannot appear after changing search or locking (1.9s)
+  ✓  23 tests/vault.spec.ts:259:1 › keyboard dialogs, legacy empty search and Command-tilde lock (1.3s)
+  ✓  24 tests/vault.spec.ts:295:1 › late old native lock notification cannot relock a newer authentication (2.2s)
+  ✓  25 tests/vault.spec.ts:311:1 › delayed pre-authentication status cannot replace the new session (3.0s)
+  ✓  26 tests/vault.spec.ts:335:1 › a second lock cancels a pending menu-open continuation (1.5s)
+  ✓  27 tests/vault.spec.ts:369:1 › a newer Create waits for the old lock and ignores its late notification (1.3s)
+  ✓  28 tests/vault.spec.ts:404:1 › an extra native lock cancels Open before its notification arrives (1.5s)
+
+  28 passed (1.1m)
+
+=== Production assets restored ===
+
+> pass-ui@2.0.2 build
+> tsc -b && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 61 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.44 kB │ gzip:  0.28 kB
+dist/assets/index-0sPzJho4.css   10.36 kB │ gzip:  2.79 kB
+dist/assets/dist-Dj54zWVT.js     58.49 kB │ gzip: 17.65 kB
+dist/assets/index-B4cOCZnU.js   220.78 kB │ gzip: 69.00 kB
+✓ built in 1.39s

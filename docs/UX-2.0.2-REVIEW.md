@@ -4,7 +4,7 @@ Reviewer: separate agent `/root/implementation_adversary`, 2026-11-09 (America/N
 
 Scope: V1 detection and explicit migration consent, import results and source preservation, friendly errors and path labels, confirmation validation, visible Lock and tooltip behavior, the fresh PassV2 settings namespace, and application/version packaging. The earlier [implementation](IMPLEMENTATION-REVIEW.md), [UI](UI-REVIEW.md) and [flow](FLOW-REVIEW.md) reviews remain separate history.
 
-**Source review complete: no unresolved blocking code finding.** The two findings below are corrected in the reviewed working tree following `eceddcbba2ff14a839fc7025e1c3e2dd69a540b2`. The complete local workflow passed. Native macOS execution is not established by this Linux review, and verification does not rely on CI.
+**Source review complete: no unresolved blocking code finding.** The two findings below are corrected. The reviewed working tree was committed unchanged as `fc9b4aee54395faa262427783a8afd9eb6de2cef`. The complete local workflow passed. Native macOS execution is not established by this Linux review, and verification does not rely on CI.
 
 ## Findings and dispositions
 

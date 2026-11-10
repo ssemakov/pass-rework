@@ -26,6 +26,8 @@ SQLCipher cannot always distinguish an incorrect key from damaged first-page aut
 
 ## Local verification
 
+Tested application source: **`fc9b4aee54395faa262427783a8afd9eb6de2cef`**. The local command ran against the working tree subsequently committed unchanged; its retained manifest correctly records the prior HEAD and `workingTreeDirty: true`. See the [evidence](evidence/ux-2.0.2.json) and [retained local logs](evidence/local-ux-2.0.2.txt).
+
 `./scripts/verify-local.sh` passed end to end on Linux: **28 browser tests**, three frontend unit tests, production build/asset restoration, Go vet and the full production-tagged race suite (vault 41.776 s, service 8.306 s, settings 1.052 s). Four source-derived legacy comparisons report zero pixels above the unchanged threshold, masking only the explicitly added Home Lock control. Other geometry/style/pixel thresholds are unchanged.
 
 New regressions cover centered import/full paths; unchanged-source preservation; live confirmation; consent focus/agreement; invalid/stale grants; missing/permission recovery; zero/nonzero same-screen results and no-picker Open; tooltip/lock bounds; delayed-result cancellation; both legacy profiles, historical/raw-key fixtures, unknown schemas and URI-special filenames. Source hash/mode/mtime and database/journal bytes are checked where applicable. Real killed V1 transactions remain untouched, while a real killed V2 edit is recovered by SQLite.
