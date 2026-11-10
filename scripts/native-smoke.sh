@@ -19,9 +19,11 @@ with tempfile.TemporaryDirectory(prefix='pass-native-restart-') as root:
         assert 'Native window frame verified: 904x534' in result.stdout, 'legacy window frame not verified'
         assert 'Native WebKit smoke passed: explicit UI assertions complete' in result.stdout, 'native smoke did not report completion'
         saved=json.loads((Path(root)/'settings.json').read_text())
-        assert saved['default_storage_path']==str(Path(root)/'storage.pass'), 'storage path was not persisted'
+        assert saved['default_storage_path']==str(Path(root)/'imported.pass'), 'imported storage path was not persisted'
         assert set(saved)=={'default_storage_path','idle_minutes'}, 'unexpected settings data'
         if phase=='restart':
             assert 'Native remembered storage restart verified' in result.stdout, 'native restart was not verified'
+        else:
+            assert 'Native import count and same-screen result verified; source unchanged' in result.stdout, 'native import count/source was not verified'
 
 PY

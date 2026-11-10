@@ -33,7 +33,7 @@ func DefaultPath() (string, error) {
 	if err != nil {
 		return "", ErrSettings
 	}
-	return filepath.Join(dir, "Pass Rework", "settings.json"), nil
+	return filepath.Join(dir, "PassV2", "settings.json"), nil
 }
 
 func New(path string) *Store            { return &Store{path: path} }

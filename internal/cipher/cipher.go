@@ -20,6 +20,8 @@ import "C"
 import (
 	"errors"
 	"math"
+	"net/url"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"unsafe"
@@ -62,14 +64,35 @@ type DB struct{ p *C.sqlite3 }
 
 // Open never creates files. Callers exclusively create and secure fresh files.
 func Open(path string, key []byte, profile int, readOnly bool) (*DB, error) {
+	return open(path, key, profile, readOnly, false)
+}
+
+// OpenImmutable inspects authenticated main-file metadata without recovering or
+// changing a journal. Only a classified V2 file may proceed to ordinary SQLite
+// recovery on the original; this is not an application recovery implementation.
+func OpenImmutable(path string, key []byte, profile int) (*DB, error) {
+	return open(path, key, profile, true, true)
+}
+func open(path string, key []byte, profile int, readOnly, immutable bool) (*DB, error) {
 	if len(key) == 0 || len(key) > 1024*1024 || strings.ContainsRune(path, 0) {
 		return nil, ErrKey
+	}
+	if immutable {
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return nil, ErrDatabase
+		}
+		u := url.URL{Scheme: "file", Path: absolute, RawQuery: "immutable=1"}
+		path = u.String()
 	}
 	cp := C.CString(path)
 	defer C.free(unsafe.Pointer(cp))
 	flags := C.int(C.SQLITE_OPEN_READWRITE | C.SQLITE_OPEN_FULLMUTEX)
 	if readOnly {
 		flags = C.SQLITE_OPEN_READONLY | C.SQLITE_OPEN_FULLMUTEX
+	}
+	if immutable {
+		flags |= C.SQLITE_OPEN_URI
 	}
 	d := &DB{}
 	if C.sqlite3_open_v2(cp, &d.p, flags, nil) != C.SQLITE_OK {

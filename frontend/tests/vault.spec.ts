@@ -55,7 +55,7 @@ test("encrypted backend CRUD, unchanged password, backup, rotation and restore",
   await lock(page);
   await expect(page.getByText("public-entry-secret")).toHaveCount(0);
   await open(page);
-  await expect(page.getByRole("alert")).toHaveText("That didn't work");
+  await expect(page.getByRole("alert")).toHaveText("Wrong password");
   await page
     .getByPlaceholder("Enter your Master Password", { exact: true })
     .fill("replacement public master");
@@ -90,7 +90,7 @@ test("encrypted backend CRUD, unchanged password, backup, rotation and restore",
     .getByLabel("Confirm Master Password", { exact: true })
     .fill("restored public master");
   await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Verified 1 secrets");
+  await expect(page.getByRole("status")).toHaveText("Imported 1 secrets");
 });
 test("cancel preserves the password and explicit blank replacement persists", async ({
   page,
@@ -160,7 +160,7 @@ test("historical migration and text-only rendering", async ({ page }) => {
     .getByLabel("Confirm Master Password", { exact: true })
     .fill(master);
   await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Verified 2 secrets");
+  await expect(page.getByRole("status")).toHaveText("Imported 2 secrets");
   await create(page);
   await add(page, "<img src=x onerror=alert(1)>", "public-secret");
   await expect(page.locator(".item-card img")).toHaveCount(0);

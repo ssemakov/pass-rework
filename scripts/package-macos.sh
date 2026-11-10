@@ -7,10 +7,7 @@ npm --prefix frontend run build
 mkdir -p build/Pass.app/Contents/MacOS build/Pass.app/Contents/Resources
 export MACOSX_DEPLOYMENT_TARGET=15.0
 CGO_ENABLED=1 go build -trimpath -tags production -ldflags='-w' -o build/Pass.app/Contents/MacOS/Pass .
-cat > build/Pass.app/Contents/Info.plist <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>Pass</string><key>CFBundleIdentifier</key><string>io.ssemakov.pass-rework</string><key>CFBundleName</key><string>Pass</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0.0</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>15.0</string><key>NSHighResolutionCapable</key><true/><key>NSRequiresAquaSystemAppearance</key><false/></dict></plist>
-PLIST
+python3 scripts/write-plist.py build/Pass.app/Contents/Info.plist
 # Local/CI builds are ad-hoc signed. Developer ID releases use a secure timestamp.
 timestamp=--timestamp
 if [ "${PASS_SIGN_IDENTITY:--}" = - ]; then timestamp=--timestamp=none; fi

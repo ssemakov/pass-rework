@@ -1,6 +1,7 @@
 // Material icon paths used by legacy Pass (@material-ui/icons 4.9.1, MIT).
 import { useId, type InputHTMLAttributes, type ReactNode } from "react";
 const paths = {
+  Lock: "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z",
   Add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
   KeyboardReturn: "M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z",
   FileCopy:
@@ -34,12 +35,14 @@ export function IconButton({
   label,
   tooltip = label,
   small = false,
+  tooltipPlacement = "right",
   ...props
 }: {
   name: keyof typeof paths;
   label: string;
   tooltip?: string;
   small?: boolean;
+  tooltipPlacement?: "right" | "left" | "bottom";
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <span className="tooltip-anchor">
@@ -51,7 +54,7 @@ export function IconButton({
       >
         <Icon name={name} />
       </button>
-      <span role="tooltip" className="tooltip">
+      <span role="tooltip" className={"tooltip " + tooltipPlacement}>
         {tooltip}
       </span>
     </span>

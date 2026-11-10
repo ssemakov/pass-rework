@@ -1,3 +1,5 @@
+> Historical restoration baseline. The owner's later 2.0.2 instructions add a header Lock button, classic confirmation fields, centered import/recovery screens, full paths, PassV2 naming and “Wrong password” wording. See [current changes](UX-2.0.2.md).
+
 # Legacy UI restoration
 
 The owner's latest instruction supersedes the initial custom UI: the Option D application mirrors the legacy product's appearance and copy. The reference is `ssemakov/pass` at [`7cd8c6c0bc395fa3676c151a84c1657cda8cb481`](https://github.com/ssemakov/pass/tree/7cd8c6c0bc395fa3676c151a84c1657cda8cb481), together with the owner's login, home, results, hover and add-form screenshots. No real account records or screenshot images are checked into the fixtures.

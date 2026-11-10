@@ -27,7 +27,7 @@ var assets embed.FS
 
 func main() {
 	if err := run(); err != nil {
-		_, _ = os.Stderr.WriteString("Pass could not start.\n")
+		_, _ = os.Stderr.WriteString("PassV2 could not start.\n")
 		os.Exit(1)
 	}
 }
@@ -76,6 +76,7 @@ func run() error {
 		return err
 	}
 	facade := service.NewWithSettings(manager, picker, authorize, settings.New(settingsPath))
+
 	sub, err := fs.Sub(assets, "frontend/dist")
 	if err != nil {
 		return err
@@ -87,7 +88,7 @@ func run() error {
 		return strconv.FormatUint(uint64(window.ID()), 10)
 	})
 	app = application.New(application.Options{
-		Name: "Pass", Description: "Another password manager.",
+		Name: "PassV2", Description: "Another password manager.",
 		Flags:    map[string]any{"vaultCapability": capability},
 		Services: []application.Service{application.NewService(facade)},
 		// Framework debug messages include binding args/results. Discard all logs,
@@ -115,7 +116,7 @@ func run() error {
 			"CmdOrCtrl+Shift+`": func(application.Window) { go manager.Lock() },
 		},
 	})
-	window = app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Pass", Name: "vault", Width: 904, Height: 534, Hidden: true, URL: "/", DevToolsEnabled: false, DefaultContextMenuDisabled: true, Mac: application.MacWindow{TabbingMode: application.MacWindowTabbingModeDisallowed}})
+	window = app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "PassV2", Name: "vault", Width: 904, Height: 534, Hidden: true, URL: "/", DevToolsEnabled: false, DefaultContextMenuDisabled: true, Mac: application.MacWindow{TabbingMode: application.MacWindowTabbingModeDisallowed}})
 	installMenu(app, window, manager)
 	for _, event := range []events.ApplicationEventType{events.Common.ScreenLocked, events.Common.SystemWillSleep, events.Mac.ApplicationWillSleep, events.Mac.ApplicationScreensDidSleep} {
 		app.Event.OnApplicationEvent(event, func(*application.ApplicationEvent) { go manager.Lock() })

@@ -46,8 +46,8 @@ func TestRawKeyLiteralCannotBypassNewVaultPasswordKDF(t *testing.T) {
 				normal := New(nil, nil)
 				e = normal.Unlock(source, key)
 				normal.Close()
-				if !errors.Is(e, ErrMasterFormat) {
-					t.Fatal("normal open accepted a raw-key password", e)
+				if !errors.Is(e, ErrLegacy) {
+					t.Fatal("legacy raw-key storage was not routed to read-only migration", e)
 				}
 				refused := filepath.Join(dir, "refused-import.pass")
 				if _, e = Import(source, refused, key, key); !errors.Is(e, ErrMasterFormat) {

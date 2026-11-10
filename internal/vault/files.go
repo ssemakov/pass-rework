@@ -11,9 +11,28 @@ import (
 	"syscall"
 )
 
-var ErrFile = errors.New("unsafe, unavailable, or changed vault file")
-var ErrBusy = errors.New("vault is already open in another process")
-var ErrExists = errors.New("destination already exists; choose a fresh filename")
+var ErrFile = errors.New("Storage file cannot be opened")
+var ErrBusy = errors.New("Storage is open in another app. Close it and try again")
+var ErrExists = errors.New("A storage file already exists here. Choose another location")
+
+type fileIssue string
+
+func (e fileIssue) Error() string        { return string(e) }
+func (e fileIssue) Is(target error) bool { return target == ErrFile }
+
+var ErrNotFound error = fileIssue("Storage file not found")
+var ErrPermissions error = fileIssue("Storage file permissions prevent opening it")
+var ErrRecovery error = fileIssue("Storage needs recovery. Open it in its original app or import a clean backup")
+
+func fileFailure(err error) error {
+	if os.IsNotExist(err) {
+		return ErrNotFound
+	}
+	if os.IsPermission(err) {
+		return ErrPermissions
+	}
+	return ErrFile
+}
 
 type location struct {
 	root       *os.Root
@@ -27,11 +46,11 @@ func locate(path string) (*location, error) {
 	}
 	parent, e := filepath.EvalSymlinks(filepath.Dir(a))
 	if e != nil {
-		return nil, ErrFile
+		return nil, fileFailure(e)
 	}
 	r, e := os.OpenRoot(parent)
 	if e != nil {
-		return nil, ErrFile
+		return nil, fileFailure(e)
 	}
 	name := filepath.Base(a)
 	if name == "." || name == "/" {
@@ -47,7 +66,10 @@ func regular(f os.FileInfo) bool {
 }
 func (l *location) check() (os.FileInfo, error) {
 	f, e := l.root.Lstat(l.name)
-	if e != nil || !regular(f) || f.Size() > 256<<20 {
+	if e != nil {
+		return nil, fileFailure(e)
+	}
+	if !regular(f) || f.Size() > 256<<20 {
 		return nil, ErrFile
 	}
 	absolute, e := os.Lstat(l.path)

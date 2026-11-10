@@ -12,7 +12,8 @@ import (
 	"github.com/ssemakov/pass-rework/internal/cipher"
 )
 
-var ErrFormat = errors.New("unsupported vault schema; migration stopped without changing the source")
+var ErrFormat = errors.New("This storage format is not supported")
+var ErrLegacy = errors.New("This is a V1 storage file. Migrate it to use it with PassV2")
 var ErrConflict = errors.New("entry changed; reload it before saving")
 var ErrInput = errors.New("invalid entry or password")
 

@@ -22,6 +22,7 @@ verification_cleanup() {
 trap verification_cleanup EXIT
 
 ./scripts/prepare-sqlcipher.sh
+python3 scripts/write-plist.py artifacts/Info.plist
 go test -count=1 -race -tags production ./... 2>&1 | tee artifacts/local-go-tests.txt
 go vet -tags production ./... 2>&1 | tee artifacts/local-go-vet.txt
 npm --prefix frontend ci --ignore-scripts --no-audit --no-fund

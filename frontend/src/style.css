@@ -115,8 +115,43 @@ p {
 }
 .storage-location > span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+.path-text {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.storage-location .path-text {
+  flex: 1;
+  text-align: right;
+}
+.storage-location .path-label {
+  flex: 0 0 auto;
+  margin-right: 12px;
+}
+.transfer-form {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+.transfer-form form {
+  width: 100%;
+}
+.storage-recovery .form-actions {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.storage-recovery .caption {
+  margin-bottom: 8px;
+}
+.outlined-field:has(input[aria-invalid="true"]) fieldset {
+  border-color: #f44336;
+}
+.outlined-field:has(input[aria-invalid="true"]) label {
+  color: #f44336;
 }
 .outlined-field {
   position: relative;
@@ -325,6 +360,10 @@ p {
   left: 50%;
   transform: translateX(-50%);
 }
+.tooltip.left {
+  left: auto;
+  right: calc(100% + 14px);
+}
 .tooltip-anchor:hover > button:not(:disabled) + .tooltip,
 .tooltip-anchor:focus-within > button:not(:disabled) + .tooltip {
   opacity: 1;
@@ -340,6 +379,10 @@ p {
   display: flex;
   align-items: center;
   gap: 24px;
+}
+.home-lock {
+  display: flex;
+  margin-left: auto;
 }
 .fab {
   font-weight: 500;

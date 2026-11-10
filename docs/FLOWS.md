@@ -1,3 +1,5 @@
+> Updated for the owner's 2.0.2 requests: full paths, friendly recovery, V1 consent, same-screen import results and header Lock. Earlier validation results below remain tied to their named commits; see [2.0.2 verification](UX-2.0.2.md).
+
 # Startup, settings and complete flow trace
 
 Reference: legacy Pass at `7cd8c6c0bc395fa3676c151a84c1657cda8cb481`. `AuthNavigation.js` checks electron-settings `default_storage_path`: absent → signup; present → login. `Login.jsx` loads that path and validates the submitted password without opening a picker. `actions/storage.js` writes the path only after successful creation. These transitions are part of the reference alongside its screenshots.
@@ -6,7 +8,7 @@ The earlier rework preserved the screen styling but omitted this persistence. It
 
 ## Preferences
 
-The macOS settings file is `~/Library/Application Support/Pass Rework/settings.json`; the initial vault destination is `storage.pass` in that directory. Directory/file permissions are `0700`/`0600`. Only `default_storage_path` and `idle_minutes` are saved. Passwords, keys and entries are never written there; the vault remains a separate encrypted portable file. Legacy settings and encrypted originals are untouched.
+The macOS settings file is `~/Library/Application Support/PassV2/settings.json`; the initial vault destination is `storage.pass` in that directory. Directory/file permissions are `0700`/`0600`. Only `default_storage_path` and `idle_minutes` are saved. Passwords, keys and entries are never written there; the vault remains a separate encrypted portable file. Legacy settings and encrypted originals are untouched.
 
 The backend loads settings once per instance and exposes opaque generation-scoped selection tokens, without a frontend method accepting arbitrary paths. Remembered/default grants are stable under status polling, renewed after lock, and retained when repeatedly choosing other files for import. A successfully created/opened vault or completely verified import becomes the default; choosing/cancelling/rejecting a key/failing an import does not change it.
 
@@ -16,22 +18,22 @@ Settings use bounded no-follow parsing and an atomic synced replacement. Ordinar
 
 | Trigger | Result / retained checks |
 |---|---|
-| No saved path | Create Storage with the original two-step confirmation and folder control, plus Import/Open alternatives. No automatic picker or database read. |
+| No saved path | Create Storage with the new/confirmation fields with live matching validation and folder control, plus Import/Open alternatives. No automatic picker or database read. |
 | Matching creation password | Create a fresh encrypted destination, verify/open it, save its path. Mismatch only says “Passwords don't match”; existing destination is refused. |
 | Restart with saved path | Preselected login asking only for the master password. Passwords and plaintext views are not restored. |
-| Rejected login key | One SQLCipher authentication attempt and “That didn't work”. Same login/selection supports a correct retry. No Choose/Create/Import/retry or full-vault scan follows rejection. |
+| Rejected login key | One submitted operation with bounded read-only format detection and “Wrong password”. Same login/selection supports a correct retry. No Choose/Create/Import/retry or full-vault scan follows rejection. |
 | Missing/moved/unavailable file | Error on the same login; retain the saved choice. Explicit File → Open can locate it. Remember the new path only after successful authentication. |
 | File → Open | Clear old password drafts; lock/acknowledge any active session; open picker. Cancel returns to remembered login, or first-run create if no path exists. Never submit the old draft to the chosen file. |
 | File → New | Lock the old session; show creation form. Destination must be fresh. Escape returns to remembered login; prior setting remains until successful creation. |
-| Import / restore | Explicit encrypted source and fresh destination; validate passwords; migrate, reopen and compare every entry. Save verified destination and return to its login. Failure/cancel preserves previous setting and source. Interrupted staging is discarded/restarted as before. |
-| Preserve original backup | Explicit source/fresh backup pickers and password/byte verification. No change to default vault; wrong-key verification has no subsequent automatic action. |
+| Import / restore | Explicit encrypted source and fresh destination; validate passwords; migrate, reopen and compare every entry. Save verified destination; keep “Imported N secrets” on the import screen. Explicit Open storage then shows its preselected login without a picker. Failure/cancel preserves previous setting and source. Interrupted staging is discarded/restarted as before. |
+| Original source preservation | Automatic: import opens the original encrypted source read-only and leaves it unchanged. No extra preservation dialog. |
 | Home/search | Total count, initially empty results, name/URL matches after three characters. Metadata listing does not prefetch passwords. |
 | Add | Original four fields and Save/Cancel. Transactional save; Cancel/Escape discards draft. Starting Add resets search. |
 | Reveal/hide/copy | Explicit read/copy only. Search/lock/transitions invalidate late reveal delivery; clipboard clearing remains ownership-checked. |
 | Edit | Metadata prefill; retain password unless explicitly replaced. Cancel discards draft. Preserve transaction/revision checks, including empty replacement. |
 | Delete | Explicit confirmation and transaction/revision check. Cancel keeps entry. |
 | Encrypted backup | Explicit fresh destination; verified encrypted snapshot. Cancel has no error or settings change. |
-| Change master password | Wrong current password only says “That didn't work”; no backup/rotation starts. Success keeps default path and retains verified old-password encrypted backup. |
+| Change master password | Wrong current password only says “Wrong password”; no backup/rotation starts. Success keeps default path and retains verified old-password encrypted backup. |
 | Inactivity preference | Validate/save 1/5/15 minutes and restore for next unlocked session. |
 | Manual/idle/system lock or sleep | Invalidate generation, scrub plaintext/drafts, close handle, clear owned clipboard. Keep non-secret remembered path; relogin needs no picker. |
 | Lock/repeated submission during work | One UI operation and one backend expensive/picker operation at a time. Reject duplicates rather than queue. Generations/nonces discard stale completions/grants; lock admission remains independent. |

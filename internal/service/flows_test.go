@@ -15,6 +15,39 @@ import (
 
 func trusted(context.Context) bool { return true }
 
+func TestMigrationPreparationUsesOnlyCurrentOpaqueSelectionAndFullPath(t *testing.T) {
+	ctx := context.Background()
+	m := vault.New(nil, nil)
+	defer m.Close()
+	path := filepath.Join(t.TempDir(), "original legacy.pass")
+	picks := 0
+	f := New(m, func(string) (string, error) { picks++; return path, nil }, trusted)
+	choice, err := f.Choose(ctx, "open")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.Label != path {
+		t.Fatal("path label was shortened")
+	}
+	if _, err = f.PrepareImport(ctx, "invalid"); err != ErrDenied {
+		t.Fatal(err)
+	}
+	prepared, err := f.PrepareImport(ctx, choice.Token)
+	if err != nil || prepared.Label != path {
+		t.Fatal(prepared, err)
+	}
+	if got, err := f.take(prepared.Token, "source"); err != nil || got != path {
+		t.Fatal(got, err)
+	}
+	if picks != 1 {
+		t.Fatal("migration preparation opened a picker")
+	}
+	f.Lock(ctx)
+	if _, err = f.PrepareImport(ctx, choice.Token); err != ErrDenied {
+		t.Fatal("stale migration grant accepted", err)
+	}
+}
+
 func TestRememberedStorageWrongKeyLockAndRealRestart(t *testing.T) {
 	ctx := context.Background()
 	prefs := settings.New(filepath.Join(t.TempDir(), "settings.json"))

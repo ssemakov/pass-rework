@@ -87,7 +87,7 @@ func AllowedMethod(name string) bool {
 		return false
 	}
 	switch strings.TrimPrefix(name, prefix) {
-	case "Choose", "State", "Unlock", "Create", "Lock", "List", "Get", "CreateEntry", "Update", "Delete", "Copy", "Activity", "SetIdle", "Backup", "PreserveBackup", "Import", "Rotate":
+	case "Choose", "State", "Unlock", "Create", "Lock", "List", "Get", "CreateEntry", "Update", "Delete", "Copy", "Activity", "SetIdle", "Backup", "PrepareImport", "Import", "Rotate":
 		return true
 	}
 	return false

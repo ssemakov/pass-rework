@@ -1,3 +1,5 @@
+> Current 2.0.2 verification: [changes/results](UX-2.0.2.md) and [independent review](UX-2.0.2-REVIEW.md). All current checks run locally; the results below remain historical for their named commits.
+
 # Validation record
 
 All fixtures and passwords are synthetic/public. No real vault, user password or plaintext export was used. The implementation branch is `implementation/option-d`; `main` is owner-controlled.

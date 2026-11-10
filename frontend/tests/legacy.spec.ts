@@ -70,6 +70,9 @@ test("legacy reference geometry, colors, copy and rendered pixels", async ({
         animations: "disabled",
         caret: "hide",
         path: testInfo.outputPath(name + ".png"),
+        // The owner explicitly added this control to the legacy layout.
+        mask: [page.locator(".home-lock")],
+        maskColor: "#f4f4f5",
       });
     const diff = await reference.evaluate(
       async ([a, b]) => {

@@ -57,7 +57,7 @@ test("service startup failure is visible and recovers without showing an unconfi
   );
   await page.reload();
   await expect(page.getByRole("alert")).toHaveText(
-    "Unable to connect to the vault service.",
+    "Could not load storage. Reopen PassV2 to try again.",
   );
   await expect(loginField(page)).toHaveCount(0);
   await page.evaluate(() =>
@@ -99,7 +99,7 @@ test("New Storage mismatch does not create; an existing default is never overwri
   await confirmation.fill("different public master");
   await confirmation.press("Enter");
   await expect(page.getByRole("alert")).toContainText(
-    "destination already exists",
+    "A storage file already exists",
   );
   expect(creates).toBe(1);
   expect((await stats(request)).settings).toBe(before);
@@ -181,7 +181,7 @@ test("rejected password performs one attempt, opens no dialog and permits a corr
         );
   });
   release();
-  await expect(page.getByRole("alert")).toHaveText("That didn't work");
+  await expect(page.getByRole("alert")).toHaveText("Wrong password");
   await expect(loginField(page)).toBeEnabled();
   await expect(loginField(page)).toHaveValue("wrong password");
   await page.waitForTimeout(1100); // Observe beyond the status polling interval.
@@ -292,14 +292,18 @@ test("first-run import rejects a bad key without changing settings; verified des
     .getByLabel("Confirm Master Password", { exact: true })
     .fill(master);
   await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("That didn't work");
+  await expect(page.getByRole("alert")).toHaveText("Wrong password");
   expect((await stats(request)).settings).toBe("");
   expect((await stats(request)).picks).toEqual({ source: 1, destination: 1 });
   await page
     .getByLabel("Backup Master Password", { exact: true })
     .fill("public-fixture-password");
   await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText(/^Verified \d+ secrets$/);
+  await expect(page.getByRole("status")).toHaveText(/^Imported \d+ secrets$/);
+  await expect(
+    page.getByRole("form", { name: "Import Storage" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open storage", exact: true }).click();
   await expect(loginField(page)).toHaveValue("");
   expect(
     JSON.parse((await stats(request)).settings).default_storage_path,
@@ -330,7 +334,7 @@ test("wrong current password during rotation leaves the unlocked vault and prefe
     .getByLabel("Confirm Master Password", { exact: true })
     .fill("replacement");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toHaveText("That didn't work");
+  await expect(dialog.getByRole("alert")).toHaveText("Wrong password");
   expect(await stats(request)).toEqual(before);
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await lock(page);

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"github.com/ssemakov/pass-rework/internal/service"
@@ -142,6 +143,22 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 		return
 	}
+	if r.Method == "POST" && r.URL.Path == "/test-open-legacy" {
+		s.pickMu.Lock()
+		s.openPath = filepath.Join(s.root, "legacy.pass")
+		s.pickMu.Unlock()
+		w.WriteHeader(204)
+		return
+	}
+	if r.Method == "POST" && r.URL.Path == "/test-permissions" {
+		v, err := settings.New(filepath.Join(s.root, "settings.json")).Load()
+		if err != nil || v.StoragePath == "" || os.Chmod(v.StoragePath, 0644) != nil {
+			http.Error(w, "permissions fixture failed", 500)
+			return
+		}
+		w.WriteHeader(204)
+		return
+	}
 	if r.Method == "POST" && r.URL.Path == "/test-move-storage" {
 		v, err := settings.New(filepath.Join(s.root, "settings.json")).Load()
 		if err != nil || v.StoragePath == "" || os.Rename(v.StoragePath, v.StoragePath+".moved") != nil {
@@ -158,8 +175,9 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.pickMu.Lock()
 		defer s.pickMu.Unlock()
 		b, _ := os.ReadFile(filepath.Join(s.root, "settings.json"))
+		legacy, _ := os.ReadFile(filepath.Join(s.root, "legacy.pass"))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"picks": s.picks, "settings": string(b)})
+		json.NewEncoder(w).Encode(map[string]any{"picks": s.picks, "settings": string(b), "legacySHA256": fmt.Sprintf("%x", sha256.Sum256(legacy))})
 		return
 	}
 	if r.Method != "POST" {

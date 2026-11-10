@@ -62,7 +62,7 @@ export async function onLock(
 }
 export function message(e: unknown) {
   if (e instanceof Error) return e.message;
-  return "That operation could not be completed. Your original vault is preserved.";
+  return "Could not complete the operation. Try again.";
 }
 
 let native: Promise<typeof import("@wailsio/runtime")> | null = null;

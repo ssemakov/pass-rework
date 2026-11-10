@@ -21,6 +21,7 @@ import {
 import { SessionFence } from "./fence";
 import { Field, Icon, IconButton } from "./legacy";
 import "./style.css";
+import { presentError, type ErrorKind } from "./errors";
 const Feedback = createContext({ error: "", notice: "" });
 const empty: Input = { name: "", login: "", password: "", url: "" };
 function App() {
@@ -45,8 +46,12 @@ function App() {
   const [panel, setPanel] = useState<
     "unlock" | "create" | "import" | "rotate" | "settings" | null
   >(null);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [passwordFocus, setPasswordFocus] = useState("password");
+  const [loginIssue, setLoginIssue] = useState<ErrorKind | null>(null);
+  const [legacyOffer, setLegacyOffer] = useState<Selection | null>(null);
+  const [importResult, setImportResult] = useState<{
+    count: number;
+    storage: Selection;
+  } | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null),
     [source, setSource] = useState<Selection | null>(null),
     [destination, setDestination] = useState<Selection | null>(null);
@@ -81,7 +86,9 @@ function App() {
     setPassword("");
     setNextPassword("");
     setConfirmation("");
-    setShowConfirmation(false);
+    setLoginIssue(null);
+    setLegacyOffer(null);
+    setImportResult(null);
     setSelection(null);
     setSource(null);
     setDestination(null);
@@ -145,7 +152,7 @@ function App() {
       else d();
     });
     void updateState().catch(() =>
-      setError("Unable to connect to the vault service."),
+      setError("Could not load storage. Reopen PassV2 to try again."),
     );
     const t = setInterval(() => {
       if (polling || busyRef.current) return;
@@ -198,12 +205,12 @@ function App() {
       const result = await task(check);
       if (fence.current.accepts(g)) success?.(result);
     } catch (e) {
-      if (fence.current.accepts(g) && message(e) !== "selection cancelled")
-        setError(
-          message(e).includes("cannot unlock")
-            ? "That didn't work"
-            : message(e),
-        );
+      if (fence.current.accepts(g) && message(e) !== "selection cancelled") {
+        const issue = presentError(e);
+        setError(issue.message);
+        if (statusRef.current.locked && panel !== "import")
+          setLoginIssue(issue.kind);
+      }
     } finally {
       if (fence.current.accepts(g)) setBusy(false);
     }
@@ -218,7 +225,7 @@ function App() {
       if (n === searchSerial.current && fence.current.accepts(g))
         setEntries(list);
     } catch (e) {
-      if (fence.current.accepts(g)) setError(message(e));
+      if (fence.current.accepts(g)) setError(presentError(e).message);
     }
   }, []);
   useEffect(() => {
@@ -271,7 +278,7 @@ function App() {
         }
         return true;
       } catch {
-        setError("Could not lock storage. Quit Pass to close it.");
+        setError("Could not lock storage. Quit PassV2 to close it.");
         return false;
       } finally {
         closing.current = null;
@@ -292,6 +299,11 @@ function App() {
         void lock();
       }
       if (e.key === "Escape") transitionSerial.current++;
+      if (e.key === "Escape" && legacyOffer && !busyRef.current) {
+        e.preventDefault();
+        setLegacyOffer(null);
+        return;
+      }
       if (e.key === "Escape" && !busy) {
         conceal();
         setEditing(undefined);
@@ -321,7 +333,9 @@ function App() {
   const openPanel = (p: typeof panel) => {
     needsStorage.current = false;
     setPanel(p);
-    setShowConfirmation(false);
+    setLoginIssue(null);
+    setLegacyOffer(null);
+    setImportResult(null);
     setSelection(null);
     setSource(null);
     setDestination(null);
@@ -342,28 +356,34 @@ function App() {
     e.preventDefault();
     if (busyRef.current || !statusRef.current.generation) return;
     const creating = panel === "create";
-    if (!password) return;
+    if (!password) {
+      setError("Enter the master password");
+      return;
+    }
     if (!selection) {
       setError("Select storage path");
       return;
     }
-    transitionSerial.current++;
-    if (creating && !showConfirmation) {
-      setShowConfirmation(true);
+    if (creating && !confirmation) {
+      setError("Confirm the master password");
+      document.getElementById("confirm-master-password")?.focus();
       return;
     }
     if (creating && password !== confirmation) {
-      setError("Passwords don't match");
+      setError("");
       return;
     }
+    transitionSerial.current++;
+    setLoginIssue(null);
     void run(
-      async () => {
+      async (check) => {
         try {
           await call(creating ? "Create" : "Unlock", selection.token, password);
-        } catch (e) {
-          if (!creating && message(e).includes("cannot unlock"))
-            throw new Error("That didn't work");
-          throw e;
+        } catch (error) {
+          check();
+          if (!creating && presentError(error).kind === "legacy")
+            setLegacyOffer(selection);
+          throw error;
         }
       },
       () => {
@@ -371,7 +391,8 @@ function App() {
         setBusy(false);
         setPassword("");
         setConfirmation("");
-        setShowConfirmation(false);
+        setLoginIssue(null);
+        setLegacyOffer(null);
         setSelection(null);
         setPanel(null);
         void updateState();
@@ -456,8 +477,13 @@ function App() {
     );
   const rotate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (busyRef.current) return;
+    if (!password || !nextPassword || !confirmation) {
+      setError("Enter and confirm the master passwords");
+      return;
+    }
     if (nextPassword !== confirmation) {
-      setError("Passwords don't match");
+      setError("");
       return;
     }
     void run(
@@ -477,49 +503,51 @@ function App() {
   };
   const importBackup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (busyRef.current) return;
-    if (!source || !destination) return;
+    if (busyRef.current || !source || !destination || importResult) return;
+    if (!password || !nextPassword || !confirmation) {
+      setError("Enter and confirm the master passwords");
+      return;
+    }
     if (nextPassword !== confirmation) {
-      setError("Passwords don't match");
+      setError("");
       return;
     }
     void run(
-      () =>
-        call<number>(
+      async (check) => {
+        const generation = statusRef.current.generation;
+        const count = await call<number>(
           "Import",
           source.token,
           destination.token,
           password,
           nextPassword,
-        ),
-      (count) => {
+        );
+        check();
+        const state = await call<Status>("State");
+        check();
+        if (state.generation !== generation || !state.locked || !state.storage)
+          throw new Error("Storage is locked. Enter your password again.");
+        return { count, state };
+      },
+      ({ count, state }) => {
         setPassword("");
         setNextPassword("");
         setConfirmation("");
-        setSource(null);
-        setDestination(null);
-        setPanel(null);
-        void updateState().then(() => setNotice(`Verified ${count} secrets`));
+        needsStorage.current = false;
+        statusRef.current = state;
+        setStatus(state);
+        setImportResult({ count, storage: state.storage! });
+        setNotice(`Imported ${count} secrets`);
       },
     );
   };
-  const preserve = () => {
-    if (!password) {
-      setError("Enter the original master password first.");
-      return;
-    }
+  const migrateLegacy = () => {
+    if (!legacyOffer) return;
     void run(
-      async (check) => {
-        const src = await call<Selection>("Choose", "source");
-        check();
-        const dst = await call<Selection>("Choose", "backup");
-        check();
-        return call("PreserveBackup", src.token, dst.token, password);
-      },
-      () => {
-        setPassword("");
-        setSource(null);
-        setNotice("Backup saved and verified");
+      () => call<Selection>("PrepareImport", legacyOffer.token),
+      (prepared) => {
+        openPanel("import");
+        setSource(prepared);
       },
     );
   };
@@ -575,18 +603,11 @@ function App() {
       status.locked &&
       status.generation &&
       !busy &&
-      !showConfirmation &&
+      !legacyOffer &&
       panel !== "import"
     )
       document.getElementById("master-password")?.focus();
-  }, [
-    panel,
-    selection,
-    status.locked,
-    status.generation,
-    busy,
-    showConfirmation,
-  ]);
+  }, [panel, selection, status.locked, status.generation, busy, legacyOffer]);
   const field = (key: keyof Input, label: string, type = "text") => (
     <Field
       dense
@@ -598,11 +619,27 @@ function App() {
       onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
     />
   );
+  const mismatch =
+    confirmation.length > 0 &&
+    (panel === "create" ? password : nextPassword) !== confirmation;
+  const validationError =
+    mismatch && ["create", "import", "rotate"].includes(panel ?? "")
+      ? "Passwords don't match"
+      : "";
+  const changeConfirmation = (value: string) => {
+    setConfirmation(value);
+    if (
+      error === "Passwords don't match" ||
+      error.startsWith("Confirm") ||
+      error.startsWith("Enter and confirm")
+    )
+      setError("");
+  };
   const messages = (
     <div className="messages">
-      {(error || status.settingsError) && (
+      {(validationError || error || status.settingsError) && (
         <div role="alert" className="error">
-          {error || status.settingsError}
+          {validationError || error || status.settingsError}
         </div>
       )}
       {notice && (
@@ -638,30 +675,21 @@ function App() {
         }
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        onFocus={() => setPasswordFocus("password")}
-        end={
-          !creating || !showConfirmation || passwordFocus === "password"
-            ? returnButton(creating ? "Continue" : "Unlock storage")
-            : undefined
-        }
+        end={!creating ? returnButton("Unlock storage") : undefined}
       />
-      {creating && showConfirmation && (
+      {creating && (
         <div className="confirmation">
           <Field
-            autoFocus
+            id="confirm-master-password"
             aria-label="Confirm Master Password"
             type="password"
             autoComplete="off"
-            disabled={busy}
+            disabled={busy || !selection}
             placeholder="Please confirm the Master Password"
             value={confirmation}
-            onChange={(e) => setConfirmation(e.target.value)}
-            onFocus={() => setPasswordFocus("confirmation")}
-            end={
-              passwordFocus !== "password"
-                ? returnButton("Create Storage")
-                : undefined
-            }
+            onChange={(e) => changeConfirmation(e.target.value)}
+            aria-invalid={mismatch}
+            end={returnButton("Create Storage")}
           />
         </div>
       )}
@@ -734,7 +762,10 @@ function App() {
   };
   return (
     <Feedback.Provider
-      value={{ error: error || status.settingsError || "", notice }}
+      value={{
+        error: validationError || error || status.settingsError || "",
+        notice,
+      }}
     >
       <div className="app" data-ready={status.generation !== ""}>
         {!status.generation ? (
@@ -758,6 +789,43 @@ function App() {
                 )}
                 {authPassword(panel === "create")}
                 <div className="auth-feedback">{messages}</div>
+                {panel !== "create" &&
+                  loginIssue &&
+                  loginIssue !== "password" && (
+                    <div className="storage-recovery">
+                      {selection && (
+                        <p className="caption path-text">{selection.label}</p>
+                      )}
+                      <div className="form-actions">
+                        {loginIssue === "legacy" && (
+                          <button
+                            type="button"
+                            className="button contained"
+                            disabled={busy}
+                            onClick={() => setLegacyOffer(selection)}
+                          >
+                            Migrate storage
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="button outlined"
+                          disabled={busy}
+                          onClick={() => void begin("unlock")}
+                        >
+                          Open storage
+                        </button>
+                        <button
+                          type="button"
+                          className="button outlined"
+                          disabled={busy}
+                          onClick={() => void begin("import")}
+                        >
+                          Import storage
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 {panel === "create" && !status.storage && (
                   <div className="startup-actions">
                     <button
@@ -832,78 +900,125 @@ function App() {
         ) : panel === "import" ? (
           <main className="fixed-container transfer-form">
             <form onSubmit={importBackup} aria-label="Import Storage">
-              <Field
-                dense
-                label="Backup Master Password"
-                type="password"
-                required
-                autoComplete="off"
-                disabled={busy}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
               <div className="storage-location">
-                <span>{source?.label ?? "Select encrypted backup"}</span>
+                <span className="path-label">Import from</span>
+                <span className="path-text">
+                  {source?.label ?? "Select encrypted backup"}
+                </span>
                 <IconButton
                   name="FolderOpen"
                   label="Select encrypted backup"
-                  disabled={busy}
+                  disabled={busy || !!importResult}
                   onClick={() => choose("source", setSource)}
                 />
               </div>
               <div className="storage-location">
-                <span>{destination?.label ?? "Select storage path"}</span>
+                <span className="path-label">Backup to</span>
+                <span className="path-text">
+                  {destination?.label ?? "Select storage path"}
+                </span>
                 <IconButton
                   name="FolderOpen"
                   label="Select fresh destination"
-                  disabled={busy}
+                  disabled={busy || !!importResult}
                   onClick={() => choose("destination", setDestination)}
                 />
               </div>
-              <Field
-                dense
-                label="New Master Password"
-                type="password"
-                required
-                autoComplete="off"
-                disabled={busy}
-                value={nextPassword}
-                onChange={(e) => setNextPassword(e.target.value)}
-              />
-              <Field
-                dense
-                label="Confirm Master Password"
-                type="password"
-                required
-                autoComplete="off"
-                disabled={busy}
-                value={confirmation}
-                onChange={(e) => setConfirmation(e.target.value)}
-              />
-              <button
-                type="button"
-                className="button text-button"
-                disabled={busy}
-                onClick={preserve}
-              >
-                Preserve original backup
-              </button>
+              <p className="caption">
+                The original storage file will be kept unchanged.
+              </p>
+              {!importResult && (
+                <>
+                  <Field
+                    dense
+                    label="Backup Master Password"
+                    type="password"
+                    autoComplete="off"
+                    disabled={busy}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <Field
+                    dense
+                    label="New Master Password"
+                    type="password"
+                    autoComplete="off"
+                    disabled={busy}
+                    value={nextPassword}
+                    onChange={(e) => setNextPassword(e.target.value)}
+                  />
+                  <Field
+                    dense
+                    label="Confirm Master Password"
+                    type="password"
+                    autoComplete="off"
+                    disabled={busy}
+                    value={confirmation}
+                    onChange={(e) => changeConfirmation(e.target.value)}
+                    aria-invalid={mismatch}
+                  />
+                </>
+              )}
               {messages}
               <div className="form-actions">
-                <button
-                  type="button"
-                  className="button outlined"
-                  disabled={busy}
-                  onClick={() => openPanel(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="button contained"
-                  disabled={busy || !source || !destination}
-                >
-                  Import
-                </button>
+                {importResult ? (
+                  <>
+                    <button
+                      type="button"
+                      className="button outlined"
+                      onClick={() => openPanel(null)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      className="button contained"
+                      onClick={() => {
+                        const result = importResult;
+                        openPanel("unlock");
+                        setSelection(result.storage);
+                      }}
+                    >
+                      Open storage
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {error &&
+                      presentError(new Error(error)).kind === "storage" && (
+                        <button
+                          type="button"
+                          className="button outlined"
+                          disabled={busy}
+                          onClick={() => void begin("unlock")}
+                        >
+                          Open storage
+                        </button>
+                      )}
+                    <button
+                      type="button"
+                      className="button outlined"
+                      disabled={busy}
+                      onClick={() => openPanel(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="button contained"
+                      disabled={
+                        busy ||
+                        !source ||
+                        !destination ||
+                        !password ||
+                        !nextPassword ||
+                        !confirmation ||
+                        mismatch
+                      }
+                    >
+                      Import
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           </main>
@@ -926,6 +1041,15 @@ function App() {
               <span className="secret-count">
                 {entries.length} secrets stored
               </span>
+              <div className="home-lock">
+                <IconButton
+                  name="Lock"
+                  label="Lock storage"
+                  tooltip="Lock storage (⌘~)"
+                  tooltipPlacement="left"
+                  onClick={() => void lock()}
+                />
+              </div>
             </div>
             <div className="search">
               <Field
@@ -940,6 +1064,24 @@ function App() {
               />
             </div>
             {messages}
+            {error && presentError(new Error(error)).kind === "storage" && (
+              <div className="form-actions">
+                <button
+                  className="button outlined"
+                  disabled={busy}
+                  onClick={() => void begin("unlock")}
+                >
+                  Open storage
+                </button>
+                <button
+                  className="button outlined"
+                  disabled={busy}
+                  onClick={() => void begin("import")}
+                >
+                  Import storage
+                </button>
+              </div>
+            )}
             <div className="items-list" aria-label="Stored secrets">
               {visible.map((entry) => (
                 <article
@@ -978,6 +1120,35 @@ function App() {
               ))}
             </div>
           </main>
+        )}
+        {legacyOffer && (
+          <Modal
+            title="V1 storage"
+            close={() => setLegacyOffer(null)}
+            busy={busy}
+          >
+            <p>This is a V1 storage file. Migrate it to use it with PassV2.</p>
+            <p className="caption path-text">{legacyOffer.label}</p>
+            <p className="caption">
+              The original storage file will be kept unchanged.
+            </p>
+            <div className="form-actions">
+              <button
+                className="button outlined"
+                disabled={busy}
+                onClick={() => setLegacyOffer(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="button contained"
+                disabled={busy}
+                onClick={migrateLegacy}
+              >
+                Migrate storage
+              </button>
+            </div>
+          </Modal>
         )}
         {!status.locked && panel === "settings" && (
           <Modal
@@ -1053,7 +1224,8 @@ function App() {
                 autoComplete="off"
                 disabled={busy}
                 value={confirmation}
-                onChange={(e) => setConfirmation(e.target.value)}
+                onChange={(e) => changeConfirmation(e.target.value)}
+                aria-invalid={mismatch}
               />
               <p className="caption">
                 The encrypted backup uses the old Master Password.
@@ -1180,6 +1352,7 @@ function Modal({
           <IconButton
             name="Close"
             label="Close dialog"
+            tooltipPlacement="left"
             disabled={busy}
             onClick={close}
           />

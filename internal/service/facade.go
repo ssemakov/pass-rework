@@ -73,7 +73,7 @@ func (f *Facade) grant(path, purpose, generation string) (*Selection, error) {
 	}
 	token := hex.EncodeToString(b)
 	f.selected[token] = selected{path, purpose, generation}
-	return &Selection{token, filepath.Base(path)}, nil
+	return &Selection{token, path}, nil
 }
 
 func nextGeneration(g string) string {
@@ -156,6 +156,10 @@ func (f *Facade) Choose(ctx context.Context, purpose string) (Selection, error) 
 	if path == "" {
 		return Selection{}, ErrCancelled
 	}
+	path, e = filepath.Abs(path)
+	if e != nil {
+		return Selection{}, errors.New("Storage location cannot be selected")
+	}
 	b := make([]byte, 24)
 	if _, e = rand.Read(b); e != nil {
 		return Selection{}, ErrDenied
@@ -176,7 +180,7 @@ func (f *Facade) Choose(ctx context.Context, purpose string) (Selection, error) 
 	}
 	f.selected[token] = selected{path, purpose, generation}
 	f.mu.Unlock()
-	return Selection{token, filepath.Base(path)}, nil
+	return Selection{token, path}, nil
 }
 func (f *Facade) State(ctx context.Context) (State, error) {
 	if e := f.allow(ctx); e != nil {
@@ -336,26 +340,36 @@ func (f *Facade) Backup(ctx context.Context, g, selection string) error {
 	}
 	return f.manager.Backup(g, path)
 }
-func (f *Facade) PreserveBackup(ctx context.Context, source, destination, password string) error {
+
+// PrepareImport reuses an already selected file after explicit migration consent.
+func (f *Facade) PrepareImport(ctx context.Context, selection string) (Selection, error) {
 	if e := f.allow(ctx); e != nil {
-		return e
+		return Selection{}, e
 	}
 	if !f.work.TryLock() {
-		return ErrWorking
+		return Selection{}, ErrWorking
 	}
 	defer f.work.Unlock()
 	generation := f.manager.Generation()
-	src, e := f.take(source, "source")
+	path, e := f.take(selection, "open")
 	if e != nil {
-		return e
+		return Selection{}, e
 	}
-	dst, e := f.take(destination, "backup")
-	if e != nil {
-		return e
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if generation != f.manager.Generation() {
+		return Selection{}, vault.ErrLocked
 	}
-	key := []byte(password)
-	defer clear(key)
-	return f.manager.PreserveBackup(src, dst, key, generation)
+	for token, grant := range f.selected {
+		if grant.purpose == "source" {
+			delete(f.selected, token)
+		}
+	}
+	s, err := f.grant(path, "source", generation)
+	if err != nil {
+		return Selection{}, err
+	}
+	return *s, nil
 }
 func (f *Facade) Import(ctx context.Context, source, destination, oldPassword, newPassword string) (int, error) {
 	if e := f.allow(ctx); e != nil {

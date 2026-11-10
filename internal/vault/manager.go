@@ -84,7 +84,7 @@ func (m *Manager) State() Status {
 	defer m.mu.Unlock()
 	s := Status{Generation: m.generation(), Locked: m.d == nil || m.activeEpoch != m.epoch.Load(), IdleMinutes: int(time.Duration(m.idle.Load()) / time.Minute)}
 	if m.loc != nil {
-		s.Label = m.loc.name
+		s.Label = m.loc.path
 	}
 	return s
 }
@@ -135,8 +135,8 @@ func (m *Manager) closeLocked() {
 	m.identity = nil
 }
 func (m *Manager) openLocked(path string, key []byte) error {
-	if e := validateMasterPassword(key); e != nil {
-		return e
+	if len(key) == 0 || len(key) > 1024*1024 {
+		return ErrInput
 	}
 	openingEpoch := m.epoch.Load()
 	loc, e := locate(path)
@@ -153,9 +153,6 @@ func (m *Manager) openLocked(path string, key []byte) error {
 	if e != nil {
 		return e
 	}
-	if before.Mode().Perm()&0077 != 0 {
-		return errors.New("vault permissions must be private (chmod 600)")
-	}
 	owner, e := loc.lock()
 	if e != nil {
 		return e
@@ -165,6 +162,18 @@ func (m *Manager) openLocked(path string, key []byte) error {
 			unlock(owner)
 		}
 	}()
+	if e = classifyStorage(loc, key, func() bool { return openingEpoch == m.epoch.Load() && !m.closed.Load() }); e != nil {
+		return e
+	}
+	if e := validateMasterPassword(key); e != nil {
+		return e
+	}
+	if openingEpoch != m.epoch.Load() || m.closed.Load() {
+		return ErrLocked
+	}
+	if before.Mode().Perm()&0077 != 0 {
+		return ErrPermissions
+	}
 	d, e := cipher.Open(loc.path, key, 4, false)
 	if e != nil {
 		return e
