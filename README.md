@@ -1,39 +1,101 @@
 # PassV2
 
-An offline macOS password manager implemented with Go, Wails, React/TypeScript and SQLCipher. Work is on `implementation/option-d`; the owner chooses what enters `main` and when to release.
+Another password manager.
 
-- Create, open, search, add, edit and delete login entries. Editing metadata preserves the existing password unless explicitly replaced.
-- Reveal credentials on demand or copy through the native clipboard. Auto-lock after 1, 5 or 15 minutes, on sleep/screen lock, or with **⌘~**. Clipboard content is cleared after 30 seconds only while Pass still owns it.
-- One portable encrypted vault, without an account, cloud service, remembered machine key or plaintext export.
-- Preserve a legacy encrypted backup, migrate or restore into a fresh destination, and verify every field of every entry before success. An interrupted import discards its incomplete destination on retry and starts over.
-- Save verified encrypted backups and change the master password while retaining an encrypted backup protected by the old password.
+A macOS rework of the original [Pass](https://github.com/ssemakov/pass), with the same minimal UI and a modern Go stack. See the [original README](https://github.com/ssemakov/pass/blob/main/README.md) and [original Pass demo](https://github.com/ssemakov/pass/blob/main/demo/pass_0_1_0_demo.gif) for its history and UI reference.
 
-The UI mirrors legacy Pass: its gray background, indigo controls, centered password field, search/count header, stacked secret cards and full-page add form. The default outer window is **904 × 534**. First launch shows Create Storage with Import/Open alternatives. Later launches read the remembered storage path and show the password field; a rejected password only shows “Wrong password”. Use **File → Open Storage…** to switch vaults, **File → New Storage…** to create another, and the plus button to add a secret. Search displays matches after three characters, as in the legacy app. Copy/reveal controls appear on hover or keyboard focus; edit/delete controls use the same icon style. Backup, import, password change and settings live in the native File menu. See [UI matching and evidence](docs/UI-RESTORATION.md) and the [complete flow trace](docs/FLOWS.md).
+- One portable, encrypted storage file. No account or cloud service required.
+- Search, add, edit and delete secrets. Reveal or copy credentials when needed.
+- Lock with **⌘~**, the Lock button, or the idle timer. Lock also follows sleep and screen lock.
+- Import original Pass storage into a fresh encrypted file, keeping the original untouched and verifying every entry.
+- Save verified encrypted backups and change the master password.
 
-Settings are saved at **`~/Library/Application Support/PassV2/settings.json`**, with the last successfully opened/created/imported `default_storage_path` and `idle_minutes`. This private, unencrypted settings file contains no passwords, keys or entries. The initial vault location is `storage.pass` in that directory; the folder button lets you choose another location. Passwords are never remembered. Settings from the earlier Pass Rework directory are not migrated. Existing storage files are not moved or modified; select one using Open Storage if needed.
+## Binaries
 
-Run **`./scripts/verify-local.sh`** to validate locally without GitHub Actions. It runs race/vet/build/unit/browser checks and restores production assets. On macOS it additionally runs the two-process native restart/incorrect-password test, builds the app, checks its encryption linkage/signature and scans the packaged binary. Logs and a local results manifest are written under `artifacts/`. Only temporary synthetic vaults are used; the native smoke does not read your real app settings or vault.
+PassV2 targets **macOS 15 and 26**, on Apple Silicon and Intel. Build the app from source using the instructions below. Packaging produces `build/Pass.app` and an architecture-specific ZIP.
 
-The deployment floor is **macOS 15**, targeting 15/26 on Apple Silicon and Intel. Earlier versions have recorded native platform evidence; current startup changes are locally validated on Linux and require the native local command for macOS execution evidence. The [validation record](docs/VALIDATION.md) separates those results. Verification does not depend on CI.
+See [build and distribution](docs/DISTRIBUTION.md) for signing and notarization, and the [validation record](docs/VALIDATION.md) for platform test results.
 
-Build on macOS with Xcode Command Line Tools, Go **1.27.3**, Node **24**, Python 3, Make and curl:
+## Getting Started
+
+### Installing
+
+Building requires macOS, Xcode Command Line Tools, Go **1.27.3**, Node **24**, Python 3, Make and curl.
+
+First, clone the repository and switch to the implementation branch:
 
 ```sh
+git clone https://github.com/ssemakov/pass-rework.git
+cd pass-rework
 git switch implementation/option-d
+```
+
+Install the dependencies:
+
+```sh
 ./scripts/prepare-sqlcipher.sh
 npm --prefix frontend ci --ignore-scripts --no-audit --no-fund
+```
+
+Build and open the app:
+
+```sh
 ./scripts/package-macos.sh
 open build/Pass.app
 ```
 
-SQLCipher source and generated C/header hashes are checked before building; no system SQLite driver is used. The native app embeds its frontend. A frontend dev server alone cannot open a vault. Local/CI bundles are ad-hoc signed; the [distribution instructions](docs/DISTRIBUTION.md) cover Developer ID signing and notarization.
+### Starting Development
 
-For migration, close the original app and choose **File → Import Storage…**. Select the original encrypted file and a new unused destination, enter the original password and matching new/confirmation passwords, then import. The source is always kept unchanged; there is no extra backup-preservation prompt. “Imported N secrets” remains on the import screen; **Open storage** takes you to the new file's login without another picker. Opening a validated V1 file offers the same migration after explicit consent. See [migration and file handling](docs/MIGRATION.md).
+After changing Go or frontend code, quit the app, rebuild with `./scripts/package-macos.sh` and reopen it. The native app embeds the frontend and uses the bundled SQLCipher implementation.
 
-Use a strong master passphrase: there is no password reset. Lock or quit before moving a vault in Finder; use **File → Save Encrypted Backup…** for a consistent copy while unlocked. Keep files on a local filesystem with working SQLite locks and atomic renames. Do not synchronize an open vault through a cloud folder.
+For a frontend-only development server:
 
-See [storage encryption evidence and threat model](docs/SECURITY.md), [adversarial implementation review](docs/IMPLEMENTATION-REVIEW.md), and [test commands/results](docs/VALIDATION.md). A commissioned external human audit is omitted from v1 as agreed; this project makes no audit or certification claim. No real vaults, passwords or exports belong in this repository or CI.
+```sh
+npm --prefix frontend run dev
+```
 
-The earlier [four-option proposal](proposals/2026-11-rework/OPTIONS.md), [UI comparison](proposals/2026-11-rework/UI-COMPARISON.md) and [discussion decisions](proposals/2026-11-rework/DISCUSSION-DECISIONS.md) are preserved as design history. This implementation selects D and supersedes their decision-pending wording.
+Use the packaged native app to exercise storage operations; the frontend preview has no storage bindings.
 
-Application version is **2.0.2**. `VERSION` supplies the native About/bundle version; `scripts/bump-version.py patch` or `minor` keeps package metadata synchronized. Patch bumps are for fixes; minor bumps are for features. The major version changes only on the owner's explicit instruction. See [2.0.2 changes and verification](docs/UX-2.0.2.md).
+### Running the tests
+
+Run all local checks with synthetic storage files:
+
+```sh
+./scripts/verify-local.sh
+```
+
+This runs Go race tests, Go vet, the production frontend build, unit tests and browser tests. On macOS it also runs native restart tests, packaging and artifact checks. Logs and the results manifest are written to `artifacts/`. Verification does not depend on GitHub Actions.
+
+For individual test commands and recorded results, see [testing and validation](docs/VALIDATION.md).
+
+## Using PassV2
+
+On first launch, create storage or choose **Import Storage…** or **Open Storage…**. To import from the original Pass, close the original app, select its encrypted storage file and a fresh destination, then enter the original password and a new password with confirmation. The import screen reports **Imported N secrets** after verification. See [migration](docs/MIGRATION.md).
+
+Later launches remember the storage path and ask for its master password. Settings are saved in `~/Library/Application Support/PassV2/settings.json`; passwords and keys are never saved there. Earlier app settings are not migrated, and existing storage files stay in place.
+
+Use the plus button to add a secret. Search starts after three characters, as in the original Pass. Copy, reveal, edit and delete controls appear on hover or keyboard focus. The native File menu contains storage, import, backup, password change and settings actions. See the [complete app flows](docs/FLOWS.md).
+
+## Built With
+
+- [Go](https://go.dev/) — native application and storage logic.
+- [Wails 3](https://wails.io/) — Go desktop framework using the system WebKit view on macOS.
+- [React](https://react.dev/) and [TypeScript](https://www.typescriptlang.org/) — the interface, matching the original Pass UI.
+- [Vite](https://vite.dev/) — frontend development and build tools.
+- [SQLCipher](https://github.com/sqlcipher/sqlcipher) — encrypted SQLite storage and transactions.
+
+## Documentation
+
+- [Storage encryption evidence and threat model](docs/SECURITY.md)
+- [Legacy UI matching](docs/UI-RESTORATION.md)
+- [Implementation review](docs/IMPLEMENTATION-REVIEW.md) and [2.0.2 review](docs/UX-2.0.2-REVIEW.md)
+- [2.0.2 changes and verification](docs/UX-2.0.2.md)
+- [Original rework options](proposals/2026-11-rework/OPTIONS.md), [UI comparison](proposals/2026-11-rework/UI-COMPARISON.md) and [design decisions](proposals/2026-11-rework/DISCUSSION-DECISIONS.md)
+
+## Versioning
+
+We use [SemVer](https://semver.org/). The application version is recorded in [VERSION](VERSION), which supplies the native About and bundle versions. Patch versions are for fixes; minor versions are for features. Major version changes require the owner's explicit instruction.
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
