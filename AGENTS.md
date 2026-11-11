@@ -1,6 +1,6 @@
 # Project instructions
 
-- Work on the owner's Option D branch; the owner chooses merges to main.
+- Work in branches; the owner chooses merges to main.
 - Do not depend on or retry GitHub Actions. Run `./scripts/verify-local.sh` with synthetic data.
 - Keep passwords, keys, real storage files and account screenshots out of commits.
 - `VERSION` is the application version used by packaging/About. Keep frontend package versions in sync.

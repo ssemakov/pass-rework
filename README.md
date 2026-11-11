@@ -22,12 +22,11 @@ See [build and distribution](docs/DISTRIBUTION.md) for signing and notarization,
 
 Building requires macOS, Xcode Command Line Tools, Go **1.27.3**, Node **24**, Python 3, Make and curl.
 
-First, clone the repository and switch to the implementation branch:
+First, clone the repository:
 
 ```sh
 git clone https://github.com/ssemakov/pass-rework.git
 cd pass-rework
-git switch implementation/option-d
 ```
 
 Install the dependencies:
@@ -90,7 +89,6 @@ Use the plus button to add a secret. Search starts after three characters, as in
 - [Legacy UI matching](docs/UI-RESTORATION.md)
 - [Implementation review](docs/IMPLEMENTATION-REVIEW.md) and [2.0.2 review](docs/UX-2.0.2-REVIEW.md)
 - [2.0.2 changes and verification](docs/UX-2.0.2.md)
-- [Original rework options](proposals/2026-11-rework/OPTIONS.md), [UI comparison](proposals/2026-11-rework/UI-COMPARISON.md) and [design decisions](proposals/2026-11-rework/DISCUSSION-DECISIONS.md)
 
 ## Versioning
 
