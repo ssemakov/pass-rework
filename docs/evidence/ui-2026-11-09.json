@@ -1,0 +1,133 @@
+{
+  "implementationCommit": "460666df2939a507a9e8591755f86e96dc6c8ff5",
+  "dateUTC": "2026-11-09",
+  "legacySourceCommit": "7cd8c6c0bc395fa3676c151a84c1657cda8cb481",
+  "windowOuterSize": [
+    904,
+    534
+  ],
+  "lockShortcut": "Command-tilde",
+  "localValidation": {
+    "browserTestsPassed": 11,
+    "browserDurationSeconds": 21.9,
+    "unitTestsPassed": 3,
+    "productionBuild": "passed",
+    "goVet": "passed",
+    "browser": "Playwright Chromium 141.0.7390.37 / build1194",
+    "launchArguments": [
+      "--disable-lcd-text"
+    ],
+    "visualTolerance": {
+      "maximumChannelDeltaIgnored": 32,
+      "maximumChangedPixelFraction": 0.0002
+    },
+    "visualResults": [
+      {
+        "screen": "login",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "home",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "results",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "add",
+        "changedPixelFraction": 0
+      }
+    ]
+  },
+  "latestNativeValidation": {
+    "status": "runner startup blocked; no test steps executed",
+    "pushRun": 42561162570,
+    "pullRequestRun": 42561168036,
+    "diagnosis": "Jobs have zero steps and no runner assignment. Logs return BlobNotFound. Account, billing or policy cause is not established.",
+    "notClaimed": "No native pass is claimed for the final commit."
+  },
+  "successfulPredecessor": {
+    "sourceCommit": "5a420d385d0fe752cb2d77ef1246d35a93c8d435",
+    "workflowRun": 42559048614,
+    "workflowURL": "https://github.com/ssemakov/pass-rework/actions/runs/42559048614",
+    "result": "all five jobs succeeded",
+    "nativeCoverage": [
+      "macOS15 arm64",
+      "macOS15 x86_64",
+      "macOS26 arm64",
+      "macOS26 x86_64"
+    ],
+    "assertions": [
+      "actual outer frame904x534",
+      "AppKit Command-L does not lock",
+      "AppKit Command-tilde locks",
+      "production WebKit UI, clipboard and bridge/navigation guards",
+      "race tests, cipher profile, migration and transaction recovery",
+      "package signature/linkage and binary advisory scans"
+    ],
+    "artifacts": [
+      {
+        "artifact": "Pass-macos-15-intel",
+        "binarySHA256": "00de4af7c3a3c13ab4eca2d4c585986535a8066559b2277e43392a4b3217bb75",
+        "executableMode": "0o100755",
+        "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830\nx86_64\ngo version go1.27.3 darwin/amd64\nXcode 16.4\nBuild version 16F6",
+        "frame": "904x534",
+        "nativeAssertions": true,
+        "artifactId": 13648278926
+      },
+      {
+        "artifact": "Pass-macos-15",
+        "binarySHA256": "5f2f446d46cf2ba962597dedf52376ae3d07f25c8cd22eee041475519cb87648",
+        "executableMode": "0o100755",
+        "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t15.8.2\nBuildVersion:\t\t24H232\narm64\ngo version go1.27.3 darwin/arm64\nXcode 16.4\nBuild version 16F6",
+        "frame": "904x534",
+        "nativeAssertions": true,
+        "artifactId": 13648488321
+      },
+      {
+        "artifact": "Pass-macos-26-intel",
+        "binarySHA256": "506cda55acee8ae21fb2a111714b1f4fbdc40cde85f079951c3c2f141418657c",
+        "executableMode": "0o100755",
+        "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.1\nBuildVersion:\t\t25G76\nx86_64\ngo version go1.27.3 darwin/amd64\nXcode 26.6\nBuild version 17F113",
+        "frame": "904x534",
+        "nativeAssertions": true,
+        "artifactId": 13649026680
+      },
+      {
+        "artifact": "Pass-macos-26",
+        "binarySHA256": "ef939433215dbbea7e0dc87822a4562d3cbd3c01484ba10b7f9aa24bcccd2391",
+        "executableMode": "0o100755",
+        "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t26.7.2\nBuildVersion:\t\t25G332\narm64\ngo version go1.27.3 darwin/arm64\nXcode 26.6\nBuild version 17F113",
+        "frame": "904x534",
+        "nativeAssertions": true,
+        "artifactId": 13648284561
+      }
+    ],
+    "browserArtifactId": 13648637353,
+    "visualResults": [
+      {
+        "screen": "login",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "home",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "results",
+        "changedPixelFraction": 0
+      },
+      {
+        "screen": "add",
+        "changedPixelFraction": 0
+      }
+    ]
+  },
+  "review": {
+    "report": "docs/UI-REVIEW.md",
+    "originalImplementationReport": "docs/IMPLEMENTATION-REVIEW.md",
+    "unresolvedCodeBlockers": 0,
+    "remainingValidationLimitation": "Final native runner admission is blocked; predecessor native evidence is identified separately."
+  }
+}

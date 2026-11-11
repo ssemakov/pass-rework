@@ -1,0 +1,140 @@
+Local synthetic validation evidence, 2026-11-09 UTC
+Application source: 2af2b2d369d585b24465f1f73f2590957ceea626
+No GitHub Actions result is used. Native macOS checks did not execute on this Linux host.
+The working-tree changes were the local runner and documentation only.
+
+Manifest:
+{
+  "status": "passed",
+  "startedAtUTC": "2026-11-09T15:21:04Z",
+  "completedAtUTC": "2026-11-09T15:22:31.299630+00:00",
+  "sourceCommit": "2af2b2d369d585b24465f1f73f2590957ceea626",
+  "workingTreeDirty": true,
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "architecture": "x86_64",
+  "raceTests": "passed",
+  "vet": "passed",
+  "productionBuild": "passed",
+  "unitTests": "passed",
+  "browserTests": "passed",
+  "nativeMacOSChecksExecuted": false,
+  "usesGitHubActions": false
+}
+
+=== Go production race tests ===
+?   	github.com/ssemakov/pass-rework/internal/cipher	[no test files]
+ok  	github.com/ssemakov/pass-rework/internal/service	5.880s
+ok  	github.com/ssemakov/pass-rework/internal/settings	1.040s
+ok  	github.com/ssemakov/pass-rework/internal/vault	28.968s
+
+=== Go vet ===
+No diagnostics.
+
+=== Production frontend build ===
+
+> pass-ui@1.0.0 build
+> tsc -b && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 60 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.44 kB │ gzip:  0.28 kB
+dist/assets/index-B5mQXa-x.css    9.71 kB │ gzip:  2.66 kB
+dist/assets/dist-Dj54zWVT.js     58.49 kB │ gzip: 17.65 kB
+dist/assets/index-CrbVL78q.js   215.54 kB │ gzip: 67.78 kB
+✓ built in 1.51s
+
+=== Frontend unit tests ===
+
+> pass-ui@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.12 /workspace/pass-rework/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  15:21:41
+   Duration  309ms (transform 62ms, setup 0ms, import 78ms, tests 66ms, environment 0ms)
+
+
+=== Browser integration tests ===
+vite v7.3.7 building client environment for e2e...
+transforming...
+✓ 60 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.44 kB │ gzip:  0.28 kB
+dist/assets/index-B5mQXa-x.css    9.71 kB │ gzip:  2.66 kB
+dist/assets/index-EI6gm6ID.js   213.48 kB │ gzip: 66.92 kB
+✓ built in 1.25s
+
+> pass-ui@1.0.0 e2e
+> playwright test
+
+
+Running 19 tests using 1 worker
+
+(node:44077) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44077) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/flows.spec.ts:40:1 › service startup failure is visible and recovers without showing an unconfigured login (2.1s)
+  ✓   2 tests/flows.spec.ts:63:1 › New Storage mismatch does not create; an existing default is never overwritten and Escape restores login (1.2s)
+  ✓   3 tests/flows.spec.ts:96:1 › first launch creates storage without a picker; real restart restores path and idle preference (2.0s)
+[WebServer] 2026-11-09 15:21:52.896: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-09 15:21:52.896: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-09 15:21:52.896: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓   4 tests/flows.spec.ts:138:1 › rejected password performs one attempt, opens no dialog and permits a correct retry (2.9s)
+  ✓   5 tests/flows.spec.ts:191:1 › cancelled Open, backup and import preserve the saved storage and clear old credentials (2.2s)
+  ✓   6 tests/flows.spec.ts:238:1 › missing remembered file stays on login until explicit Open selects its moved path (1.6s)
+[WebServer] 2026-11-09 15:21:59.090: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-09 15:21:59.091: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-09 15:21:59.092: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-09 15:21:59.123: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-09 15:21:59.123: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-09 15:21:59.123: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓   7 tests/flows.spec.ts:261:1 › first-run import rejects a bad key without changing settings; verified destination survives restart (2.4s)
+  ✓   8 tests/flows.spec.ts:316:1 › wrong current password during rotation leaves the unlocked vault and preferences intact (1.1s)
+login: legacy geometry/styles match; changed pixels 0
+home: legacy geometry/styles match; changed pixels 0
+results: legacy geometry/styles match; changed pixels 0
+add: legacy geometry/styles match; changed pixels 0
+  ✓   9 tests/legacy.spec.ts:20:1 › legacy reference geometry, colors, copy and rendered pixels (3.0s)
+[WebServer] 2026-11-09 15:22:09.201: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-09 15:22:09.201: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-09 15:22:09.201: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+[WebServer] 2026-11-09 15:22:10.224: ERROR CORE sqlcipher_page_cipher: hmac check failed for pgno=1
+[WebServer] 2026-11-09 15:22:10.224: ERROR CORE sqlite3Codec: error decrypting page 1 data: 1
+[WebServer] 2026-11-09 15:22:10.224: ERROR CORE sqlcipher_codec_ctx_set_error: 1 lock=0
+  ✓  10 tests/vault.spec.ts:10:1 › encrypted backend CRUD, unchanged password, backup, rotation and restore (6.8s)
+  ✓  11 tests/vault.spec.ts:125:1 › cancel preserves the password and explicit blank replacement persists (2.1s)
+  ✓  12 tests/vault.spec.ts:191:1 › historical migration and text-only rendering (2.4s)
+  ✓  13 tests/vault.spec.ts:221:1 › late reveal cannot appear after changing search or locking (1.3s)
+  ✓  14 tests/vault.spec.ts:259:1 › keyboard dialogs, legacy empty search and Command-tilde lock (1.2s)
+  ✓  15 tests/vault.spec.ts:295:1 › late old native lock notification cannot relock a newer authentication (1.5s)
+  ✓  16 tests/vault.spec.ts:311:1 › delayed pre-authentication status cannot replace the new session (2.9s)
+  ✓  17 tests/vault.spec.ts:335:1 › a second lock cancels a pending menu-open continuation (1.6s)
+  ✓  18 tests/vault.spec.ts:369:1 › a newer Create waits for the old lock and ignores its late notification (1.3s)
+  ✓  19 tests/vault.spec.ts:404:1 › an extra native lock cancels Open before its notification arrives (1.4s)
+
+  19 passed (42.2s)
+
+=== Production assets restored ===
+
+> pass-ui@1.0.0 build
+> tsc -b && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 60 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.44 kB │ gzip:  0.28 kB
+dist/assets/index-B5mQXa-x.css    9.71 kB │ gzip:  2.66 kB
+dist/assets/dist-Dj54zWVT.js     58.49 kB │ gzip: 17.65 kB
+dist/assets/index-CrbVL78q.js   215.54 kB │ gzip: 67.78 kB
+✓ built in 1.27s

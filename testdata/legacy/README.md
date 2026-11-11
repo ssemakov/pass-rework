@@ -1,0 +1,9 @@
+# Public synthetic historical-driver fixture
+
+`journeyapps-4.0.0.pass` contains only synthetic data; its password is **public-fixture-password**. `expected.json` records every expected entry and the driver-reported cipher settings. Never substitute a production vault.
+
+Generated from the opening sequence and Knex schema at legacy commit `7cd8c6c0bc395fa3676c151a84c1657cda8cb481`, using the original app lockfile's `@journeyapps/sqlcipher@4.0.0` and Knex 0.20.4. The driver reports **SQLCipher 4.2.0, 4096-byte pages, 256000 KDF iterations**: its compatibility-before-key sequence did not produce a profile-3 file on this Linux build. Tests additionally cover explicit profile 3 and profile 4, including exact signed 64-bit integers, nulls, NULs, Unicode and sequence state.
+
+Reproduction uses isolated Node v12.22.12 (official archive, SHA256 checked against its release SHASUMS), the old driver's prebuilt node-v72-linux-x64 binary and an isolated libssl1.1 compatibility library. The latter was Debian `libssl1.1_1.1.1w-0+deb11u1_amd64.deb`, SHA256 `aadf8b4b197335645b230c2839b4517aa444fd2e8f434e5438c48a18857988f7`. These dependencies are **test generation only** and are not shipped or needed to run the fixture tests. Main app storage is built from pinned SQLCipher 4.20.0 with CommonCrypto on macOS.
+
+Install those historical modules outside the product dependency tree, expose the driver as `sqlite3` for Knex (as the legacy package alias did), set `PASS_LEGACY_MODULES` to that node_modules directory and run `generate.cjs` with Node12. The script refuses to overwrite an existing fixture. Generated ciphertext bytes may vary because salts/IVs are random; expected logical values and engine settings must match. This is source/driver-path evidence on Linux, not a claim that an original shipped macOS binary was inspected.
